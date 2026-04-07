@@ -181,7 +181,7 @@ export default function ForkliftFormPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1">
               <h2 className="font-bold text-gray-700 text-sm uppercase tracking-wide px-1">2. Kontrol Listesi</h2>
-              <p className="text-xs text-gray-400 px-1">Her madde için Uygun / Uygun Değil seçiniz</p>
+              <p className="text-xs text-gray-400 px-1">Her madde için Evet / Hayır seçiniz</p>
             </div>
 
             {forkliftChecklist.map(item => (
@@ -190,6 +190,7 @@ export default function ForkliftFormPage() {
                 item={item}
                 value={answers[item.id]}
                 onChange={handleAnswer}
+                yesNo
               />
             ))}
 

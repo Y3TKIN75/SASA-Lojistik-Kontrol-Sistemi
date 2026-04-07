@@ -4,6 +4,7 @@ interface Props {
   item: ChecklistItemDef;
   value: CheckResult | undefined;
   onChange: (id: number, value: CheckResult) => void;
+  yesNo?: boolean;
 }
 
 const turColors: Record<CheckType, string> = {
@@ -13,7 +14,7 @@ const turColors: Record<CheckType, string> = {
   'Genel':     'bg-gray-100 text-gray-700',
 };
 
-export default function ChecklistItem({ item, value, onChange }: Props) {
+export default function ChecklistItem({ item, value, onChange, yesNo = false }: Props) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 space-y-3">
       <div className="flex items-start gap-2">
@@ -35,7 +36,7 @@ export default function ChecklistItem({ item, value, onChange }: Props) {
               : 'bg-green-50 text-green-700 border-2 border-green-300'
           }`}
         >
-          UYGUN
+          {yesNo ? 'EVET' : 'UYGUN'}
         </button>
         <button
           type="button"
@@ -46,7 +47,7 @@ export default function ChecklistItem({ item, value, onChange }: Props) {
               : 'bg-red-50 text-red-700 border-2 border-red-300'
           }`}
         >
-          UYGUN DEĞİL
+          {yesNo ? 'HAYIR' : 'UYGUN DEĞİL'}
         </button>
       </div>
     </div>
