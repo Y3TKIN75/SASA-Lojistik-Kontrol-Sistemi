@@ -37,6 +37,8 @@ export interface FormSubmission {
   checklist: ChecklistItemResult[];
   form_date: string;
   submitted_at: string;
+  forklift_no?: string | null;
+  calisma_saati?: string | null;
 }
 
 export interface SessionData {

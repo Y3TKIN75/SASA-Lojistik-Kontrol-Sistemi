@@ -141,21 +141,13 @@ export default function ForkliftFormPage() {
               <span className="font-medium text-gray-800">{session.ad_soyad}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">Forklift No</span>
-              <span className="font-medium text-gray-800">{forkliftNo}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Çalışma Saati</span>
-              <span className="font-medium text-gray-800">{calismaSaati}</span>
-            </div>
-            <div className="flex justify-between">
               <span className="text-gray-500">Vardiya</span>
               <span className="font-semibold text-[#003F87]">{vardiya}</span>
             </div>
           </div>
           <p className="text-[#003F87] font-bold text-lg">İyi çalışmalar, {session.ad_soyad.split(' ')[0]}!</p>
           <button
-            onClick={handleLogout}
+            onClick={() => navigate('/', { replace: true })}
             className="w-full bg-[#003F87] text-white font-bold py-4 rounded-xl mt-2"
           >
             Tamam
@@ -200,13 +192,16 @@ export default function ForkliftFormPage() {
           <h2 className="font-bold text-gray-700 text-sm uppercase tracking-wide">2. Forklift Bilgileri</h2>
           <div>
             <label className="text-sm text-gray-500 block mb-1">Forklift Numarası</label>
-            <input
-              type="text"
+            <select
               value={forkliftNo}
               onChange={e => setForkliftNo(e.target.value)}
-              placeholder="Örn: F-01"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#003F87]/30"
-            />
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#003F87]/30 bg-white"
+            >
+              <option value="">Seçiniz...</option>
+              {Array.from({ length: 160 }, (_, i) => i + 1).map(n => (
+                <option key={n} value={String(n)}>{n}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="text-sm text-gray-500 block mb-1">Forklift Çalışma Saati</label>

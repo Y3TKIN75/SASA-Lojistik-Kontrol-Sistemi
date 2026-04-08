@@ -19,6 +19,9 @@ export default function DashboardPage() {
   const [submissions, setSubmissions] = useState<FormSubmission[]>([]);
   const [loadingSubs, setLoadingSubs] = useState(false);
   const [selectedSubmission, setSelectedSubmission] = useState<FormSubmission | null>(null);
+  const [showForkliftSaatleri, setShowForkliftSaatleri] = useState(false);
+  const [forkliftSaatleri, setForkliftSaatleri] = useState<{ forklift_no: string; calisma_saati: string }[]>([]);
+  const [loadingFS, setLoadingFS] = useState(false);
 
   // Seçilen tarihe göre formları yükle
   useEffect(() => {
@@ -38,6 +41,30 @@ export default function DashboardPage() {
   const handleLogout = () => {
     clearSession();
     navigate('/', { replace: true });
+  };
+
+  const handleOpenForkliftSaatleri = async () => {
+    setShowForkliftSaatleri(true);
+    setLoadingFS(true);
+    const { data } = await supabase
+      .from('form_submissions')
+      .select('forklift_no, calisma_saati, submitted_at')
+      .eq('vehicle_type', 'forklift')
+      .not('forklift_no', 'is', null)
+      .order('submitted_at', { ascending: false });
+
+    // Her forklift için en son kaydı al
+    const map = new Map<string, string>();
+    for (const row of (data ?? [])) {
+      if (row.forklift_no && !map.has(row.forklift_no)) {
+        map.set(row.forklift_no, row.calisma_saati ?? '-');
+      }
+    }
+    const sorted = Array.from(map.entries())
+      .map(([forklift_no, calisma_saati]) => ({ forklift_no, calisma_saati }))
+      .sort((a, b) => Number(a.forklift_no) - Number(b.forklift_no));
+    setForkliftSaatleri(sorted);
+    setLoadingFS(false);
   };
 
   // Özet sayılar
@@ -71,6 +98,14 @@ export default function DashboardPage() {
       </div>
 
       <div className="px-4 py-4 space-y-4 max-w-2xl mx-auto w-full">
+        {/* Forklift Saatleri Butonu */}
+        <button
+          onClick={handleOpenForkliftSaatleri}
+          className="w-full bg-white border-2 border-[#003F87] text-[#003F87] font-bold py-3 rounded-xl text-sm active:scale-95 transition-transform"
+        >
+          Forklift Saatleri
+        </button>
+
         {/* Tarih Filtresi */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">Tarih Seçin</label>
@@ -157,6 +192,52 @@ export default function DashboardPage() {
         <div className="h-6" />
       </div>
 
+      {/* Forklift Saatleri Modalı */}
+      {showForkliftSaatleri && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center"
+          onClick={() => setShowForkliftSaatleri(false)}
+        >
+          <div
+            className="bg-white rounded-t-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+              <div className="font-bold text-gray-800">Forklift Saatleri</div>
+              <button
+                onClick={() => setShowForkliftSaatleri(false)}
+                className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center"
+              >
+                <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-4 py-3">
+              {loadingFS ? (
+                <div className="text-center py-8 text-gray-400 text-sm">Yükleniyor...</div>
+              ) : forkliftSaatleri.length === 0 ? (
+                <div className="text-center py-8 text-gray-400 text-sm">Henüz veri yok.</div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  <div className="flex justify-between py-2 text-xs font-bold text-gray-400 uppercase">
+                    <span>Forklift No</span>
+                    <span>Çalışma Saati</span>
+                  </div>
+                  {forkliftSaatleri.map(row => (
+                    <div key={row.forklift_no} className="flex justify-between py-3 text-sm">
+                      <span className="font-semibold text-gray-700">No {row.forklift_no}</span>
+                      <span className="font-bold text-[#003F87]">{row.calisma_saati}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="h-6" />
+          </div>
+        </div>
+      )}
+
       {/* Form Detay Modalı */}
       {selectedSubmission && (
         <div
@@ -185,7 +266,19 @@ export default function DashboardPage() {
                 </svg>
               </button>
             </div>
-            <div className="px-4 py-4 space-y-2">
+            <div className="px-4 py-4 space-y-3">
+              {selectedSubmission.vehicle_type === 'forklift' && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Forklift No</span>
+                    <span className="font-semibold text-gray-800">{selectedSubmission.forklift_no ?? '-'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Çalışma Saati</span>
+                    <span className="font-semibold text-gray-800">{selectedSubmission.calisma_saati ?? '-'}</span>
+                  </div>
+                </div>
+              )}
               {(selectedSubmission.checklist as ChecklistItemResult[]).map(item => (
                 <div
                   key={item.id}
@@ -197,11 +290,16 @@ export default function DashboardPage() {
                   <div className="flex-1">
                     <p className="text-sm text-gray-800">{item.soru}</p>
                     <span className="text-xs text-gray-400">{item.tur}</span>
+                    {item.sonuc === 'uygun_degil' && item.aciklama && (
+                      <p className="text-xs text-red-700 mt-1 bg-red-100 rounded px-2 py-1">
+                        Açıklama: {item.aciklama}
+                      </p>
+                    )}
                   </div>
-                  <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+                  <span className={`text-xs font-bold px-2 py-1 rounded-full shrink-0 ${
                     item.sonuc === 'uygun' ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'
                   }`}>
-                    {item.sonuc === 'uygun' ? 'UYGUN' : 'UYGUN DEĞİL'}
+                    {item.sonuc === 'uygun' ? 'EVET' : 'HAYIR'}
                   </span>
                 </div>
               ))}
