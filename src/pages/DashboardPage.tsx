@@ -22,6 +22,9 @@ export default function DashboardPage() {
   const [showForkliftSaatleri, setShowForkliftSaatleri] = useState(false);
   const [forkliftSaatleri, setForkliftSaatleri] = useState<{ forklift_no: string; calisma_saati: string }[]>([]);
   const [loadingFS, setLoadingFS] = useState(false);
+  const [showDoldurmadi, setShowDoldurmadi] = useState(false);
+  const [doldurmadi, setDoldurmadi] = useState<{ ad_soyad: string; sicil_no: string }[]>([]);
+  const [loadingDoldurmadi, setLoadingDoldurmadi] = useState(false);
 
   // Seçilen tarihe göre formları yükle
   useEffect(() => {
@@ -65,6 +68,21 @@ export default function DashboardPage() {
       .sort((a, b) => Number(a.forklift_no) - Number(b.forklift_no));
     setForkliftSaatleri(sorted);
     setLoadingFS(false);
+  };
+
+  const handleOpenDoldurmadi = async () => {
+    setShowDoldurmadi(true);
+    setLoadingDoldurmadi(true);
+    const [{ data: operators }, { data: subs }] = await Promise.all([
+      supabase.from('operators').select('sicil_no, ad_soyad').eq('is_active', true),
+      supabase.from('form_submissions').select('sicil_no').eq('form_date', selectedDate),
+    ]);
+    const dolduranlar = new Set((subs ?? []).map((s: { sicil_no: string }) => s.sicil_no));
+    const liste = (operators ?? [])
+      .filter((op: { sicil_no: string; ad_soyad: string }) => !dolduranlar.has(op.sicil_no))
+      .sort((a: { ad_soyad: string }, b: { ad_soyad: string }) => a.ad_soyad.localeCompare(b.ad_soyad, 'tr'));
+    setDoldurmadi(liste);
+    setLoadingDoldurmadi(false);
   };
 
   // Özet sayılar
@@ -189,8 +207,61 @@ export default function DashboardPage() {
           })
         )}
 
+        <button
+          onClick={handleOpenDoldurmadi}
+          className="w-full bg-white border-2 border-red-300 text-red-600 font-bold py-3 rounded-xl text-sm active:scale-95 transition-transform"
+        >
+          Bu Tarihte Form Doldurmadı
+        </button>
+
         <div className="h-6" />
       </div>
+
+      {/* Form Doldurmadı Modalı */}
+      {showDoldurmadi && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center"
+          onClick={() => setShowDoldurmadi(false)}
+        >
+          <div
+            className="bg-white rounded-t-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+              <div>
+                <div className="font-bold text-gray-800">Form Doldurmadı</div>
+                <div className="text-xs text-gray-500">{selectedDate}</div>
+              </div>
+              <button
+                onClick={() => setShowDoldurmadi(false)}
+                className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center"
+              >
+                <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-4 py-3">
+              {loadingDoldurmadi ? (
+                <div className="text-center py-8 text-gray-400 text-sm">Yükleniyor...</div>
+              ) : doldurmadi.length === 0 ? (
+                <div className="text-center py-8 text-green-600 text-sm font-medium">Tüm operatörler form doldurdu.</div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  <div className="py-2 text-xs font-bold text-gray-400 uppercase">{doldurmadi.length} operatör</div>
+                  {doldurmadi.map(op => (
+                    <div key={op.sicil_no} className="flex justify-between items-center py-3 text-sm">
+                      <span className="font-medium text-gray-800">{op.ad_soyad}</span>
+                      <span className="text-xs text-gray-400">{op.sicil_no}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="h-6" />
+          </div>
+        </div>
+      )}
 
       {/* Forklift Saatleri Modalı */}
       {showForkliftSaatleri && (
