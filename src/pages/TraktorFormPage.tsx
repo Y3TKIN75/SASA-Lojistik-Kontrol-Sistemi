@@ -6,12 +6,12 @@ import type { CheckResult, Vardiya } from '../types';
 import { traktorChecklist } from '../data/checklists';
 import ChecklistItem from '../components/ChecklistItem';
 
-// Vardiya başlamadan 30 dakika önce bir sonraki vardiyaya geçiş yapar.
-// 23:30-07:29 → 00:00-08:00 | 07:30-15:29 → 08:00-16:00 | 15:30-23:29 → 16:00-00:00
+// Vardiya başlamadan 15 dakika önce bir sonraki vardiyaya geçiş yapar.
+// 23:45-07:44 → 00:00-08:00 | 07:45-15:44 → 08:00-16:00 | 15:45-23:44 → 16:00-00:00
 function detectVardiya(): Vardiya {
   const now = new Date();
   const m = now.getHours() * 60 + now.getMinutes();
-  if (m >= 23 * 60 + 30 || m < 7 * 60 + 30) return '00:00-08:00';
+  if (m >= 23 * 60 + 45 || m < 7 * 60 + 45) return '00:00-08:00';
   if (m < 15 * 60 + 30) return '08:00-16:00';
   return '16:00-00:00';
 }

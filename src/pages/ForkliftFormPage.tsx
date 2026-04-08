@@ -9,8 +9,8 @@ import ChecklistItem from '../components/ChecklistItem';
 function detectVardiya(): Vardiya {
   const now = new Date();
   const m = now.getHours() * 60 + now.getMinutes();
-  if (m >= 23 * 60 + 30 || m < 7 * 60 + 30) return '00:00-08:00';
-  if (m < 15 * 60 + 30) return '08:00-16:00';
+  if (m >= 23 * 60 + 45 || m < 7 * 60 + 45) return '00:00-08:00';
+  if (m < 15 * 60 + 45) return '08:00-16:00';
   return '16:00-00:00';
 }
 
@@ -32,6 +32,7 @@ export default function ForkliftFormPage() {
   const [vardiya] = useState<Vardiya>(detectVardiya());
   const [forkliftNo, setForkliftNo] = useState('');
   const [calismaSaati, setCalismaSaati] = useState('');
+  const [sonKayitSaat, setSonKayitSaat] = useState<number | null>(null);
   const [answers, setAnswers] = useState<Record<number, CheckResult>>({});
   const [notes, setNotes] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
@@ -65,6 +66,20 @@ export default function ForkliftFormPage() {
     };
     checkDuplicate();
   }, [vardiya, session.sicil_no]);
+
+  const handleForkliftNoChange = async (no: string) => {
+    setForkliftNo(no);
+    if (!no) { setSonKayitSaat(null); return; }
+    const { data } = await supabase
+      .from('form_submissions')
+      .select('calisma_saati')
+      .eq('vehicle_type', 'forklift')
+      .eq('forklift_no', no)
+      .order('submitted_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    setSonKayitSaat(data?.calisma_saati ? Number(data.calisma_saati) : null);
+  };
 
   const handleAnswer = (id: number, value: CheckResult) => {
     setAnswers(prev => ({ ...prev, [id]: value }));
@@ -194,7 +209,7 @@ export default function ForkliftFormPage() {
             <label className="text-sm text-gray-500 block mb-1">Forklift Numarası</label>
             <select
               value={forkliftNo}
-              onChange={e => setForkliftNo(e.target.value)}
+              onChange={e => handleForkliftNoChange(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#003F87]/30 bg-white"
             >
               <option value="">Seçiniz...</option>
@@ -212,6 +227,11 @@ export default function ForkliftFormPage() {
               placeholder="Örn: 1250"
               className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#003F87]/30"
             />
+            {sonKayitSaat !== null && calismaSaati.trim() !== '' && Math.abs(Number(calismaSaati) - sonKayitSaat) > 100 && (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-1">
+                {forkliftNo} no'lu forklift'in son kaydı {sonKayitSaat} saat. Emin misin?
+              </p>
+            )}
           </div>
         </div>
 
