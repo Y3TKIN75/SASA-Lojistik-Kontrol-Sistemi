@@ -5,6 +5,8 @@ interface Props {
   value: CheckResult | undefined;
   onChange: (id: number, value: CheckResult) => void;
   yesNo?: boolean;
+  noteValue?: string;
+  onNoteChange?: (id: number, note: string) => void;
 }
 
 const turColors: Record<CheckType, string> = {
@@ -14,7 +16,7 @@ const turColors: Record<CheckType, string> = {
   'Genel':     'bg-gray-100 text-gray-700',
 };
 
-export default function ChecklistItem({ item, value, onChange, yesNo = false }: Props) {
+export default function ChecklistItem({ item, value, onChange, yesNo = false, noteValue, onNoteChange }: Props) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 space-y-3">
       <div className="flex items-start gap-2">
@@ -50,6 +52,15 @@ export default function ChecklistItem({ item, value, onChange, yesNo = false }: 
           {yesNo ? 'HAYIR' : 'UYGUN DEĞİL'}
         </button>
       </div>
+      {value === 'uygun_degil' && onNoteChange && (
+        <textarea
+          className="w-full border border-red-300 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-red-300"
+          placeholder="Açıklama giriniz..."
+          rows={3}
+          value={noteValue || ''}
+          onChange={e => onNoteChange(item.id, e.target.value)}
+        />
+      )}
     </div>
   );
 }

@@ -14,6 +14,7 @@ export interface ChecklistItemResult {
   soru: string;
   tur: CheckType;
   sonuc: CheckResult;
+  aciklama?: string | null;
 }
 
 export interface Operator {

@@ -30,7 +30,10 @@ export default function ForkliftFormPage() {
   const session = getSession()!;
 
   const [vardiya] = useState<Vardiya>(detectVardiya());
+  const [forkliftNo, setForkliftNo] = useState('');
+  const [calismaSaati, setCalismaSaati] = useState('');
   const [answers, setAnswers] = useState<Record<number, CheckResult>>({});
+  const [notes, setNotes] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +70,14 @@ export default function ForkliftFormPage() {
     setAnswers(prev => ({ ...prev, [id]: value }));
   };
 
-  const allAnswered = forkliftChecklist.every(item => answers[item.id] !== undefined);
+  const handleNoteChange = (id: number, note: string) => {
+    setNotes(prev => ({ ...prev, [id]: note }));
+  };
+
+  const allAnswered =
+    forkliftNo.trim() !== '' &&
+    calismaSaati.trim() !== '' &&
+    forkliftChecklist.every(item => answers[item.id] !== undefined);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,6 +91,7 @@ export default function ForkliftFormPage() {
       soru: item.soru,
       tur: item.tur,
       sonuc: answers[item.id],
+      aciklama: answers[item.id] === 'uygun_degil' ? (notes[item.id] || null) : null,
     }));
 
     const { error: dbError } = await supabase.from('form_submissions').insert({
@@ -91,6 +102,8 @@ export default function ForkliftFormPage() {
       vehicle_type: 'forklift',
       checklist,
       form_date: getFormDate(),
+      forklift_no: forkliftNo,
+      calisma_saati: calismaSaati,
     });
 
     setLoading(false);
@@ -122,13 +135,30 @@ export default function ForkliftFormPage() {
             </svg>
           </div>
           <h2 className="text-2xl font-bold text-gray-800">Form Gönderildi!</h2>
-          <p className="text-gray-500">Forklift kontrol formunuz başarıyla kaydedildi.</p>
-          <p className="text-sm text-gray-400">Vardiya: {vardiya}</p>
+          <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm text-left">
+            <div className="flex justify-between">
+              <span className="text-gray-500">Ad Soyad</span>
+              <span className="font-medium text-gray-800">{session.ad_soyad}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Forklift No</span>
+              <span className="font-medium text-gray-800">{forkliftNo}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Çalışma Saati</span>
+              <span className="font-medium text-gray-800">{calismaSaati}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Vardiya</span>
+              <span className="font-semibold text-[#003F87]">{vardiya}</span>
+            </div>
+          </div>
+          <p className="text-[#003F87] font-bold text-lg">İyi çalışmalar, {session.ad_soyad.split(' ')[0]}!</p>
           <button
             onClick={handleLogout}
             className="w-full bg-[#003F87] text-white font-bold py-4 rounded-xl mt-2"
           >
-            Çıkış Yap
+            Tamam
           </button>
         </div>
       </div>
@@ -166,6 +196,30 @@ export default function ForkliftFormPage() {
           </div>
         </div>
 
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 space-y-3">
+          <h2 className="font-bold text-gray-700 text-sm uppercase tracking-wide">2. Forklift Bilgileri</h2>
+          <div>
+            <label className="text-sm text-gray-500 block mb-1">Forklift Numarası</label>
+            <input
+              type="text"
+              value={forkliftNo}
+              onChange={e => setForkliftNo(e.target.value)}
+              placeholder="Örn: F-01"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#003F87]/30"
+            />
+          </div>
+          <div>
+            <label className="text-sm text-gray-500 block mb-1">Forklift Çalışma Saati</label>
+            <input
+              type="text"
+              value={calismaSaati}
+              onChange={e => setCalismaSaati(e.target.value)}
+              placeholder="Örn: 1250"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#003F87]/30"
+            />
+          </div>
+        </div>
+
         {checking && (
           <div className="bg-gray-100 rounded-xl p-4 text-center text-sm text-gray-500">Kontrol ediliyor...</div>
         )}
@@ -180,7 +234,8 @@ export default function ForkliftFormPage() {
         {!alreadySubmitted && !checking && (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1">
-              <h2 className="font-bold text-gray-700 text-sm uppercase tracking-wide px-1">2. Kontrol Listesi</h2>
+              <h2 className="font-bold text-gray-700 text-sm uppercase tracking-wide px-1">3. Kontrol Listesi</h2>
+
               <p className="text-xs text-gray-400 px-1">Her madde için Evet / Hayır seçiniz</p>
             </div>
 
@@ -191,17 +246,10 @@ export default function ForkliftFormPage() {
                 value={answers[item.id]}
                 onChange={handleAnswer}
                 yesNo
+                noteValue={notes[item.id]}
+                onNoteChange={handleNoteChange}
               />
             ))}
-
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-1">
-              <h2 className="font-bold text-amber-800 text-sm uppercase tracking-wide">3. Uyarılar</h2>
-              <ul className="text-xs text-amber-700 space-y-1 list-disc list-inside">
-                <li>Uygunsuzluk tespit edilmesi durumunda araç kullanılmayacaktır.</li>
-                <li>Tespit edilen uygunsuzluklar amire bildirilecektir.</li>
-                <li>Form doldurulmadan araç kullanımı yasaktır.</li>
-              </ul>
-            </div>
 
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm font-medium">
