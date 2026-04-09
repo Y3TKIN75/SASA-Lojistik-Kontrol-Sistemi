@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { clearSession, getSession } from '../lib/session';
@@ -279,15 +280,15 @@ export default function DashboardPage() {
                 {forkliftSaatleri.length > 0 && (
                   <button
                     onClick={() => {
-                      const header = 'Forklift No,Çalışma Saati\n';
-                      const rows = forkliftSaatleri.map(r => `${r.forklift_no},${r.calisma_saati}`).join('\n');
-                      const blob = new Blob(['\uFEFF' + header + rows], { type: 'text/csv;charset=utf-8;' });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `forklift-saatleri-${new Date().toISOString().split('T')[0]}.csv`;
-                      a.click();
-                      URL.revokeObjectURL(url);
+                      const wsData = [
+                        ['Forklift No', 'Çalışma Saati'],
+                        ...forkliftSaatleri.map(r => [Number(r.forklift_no), Number(r.calisma_saati)]),
+                      ];
+                      const ws = XLSX.utils.aoa_to_sheet(wsData);
+                      ws['!cols'] = [{ wch: 14 }, { wch: 16 }];
+                      const wb = XLSX.utils.book_new();
+                      XLSX.utils.book_append_sheet(wb, ws, 'Forklift Saatleri');
+                      XLSX.writeFile(wb, `forklift-saatleri-${new Date().toISOString().split('T')[0]}.xlsx`);
                     }}
                     className="flex items-center gap-1.5 bg-green-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg active:scale-95 transition-transform"
                   >
