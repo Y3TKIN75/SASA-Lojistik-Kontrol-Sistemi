@@ -1,14 +1,51 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { setSession, getSession } from '../lib/session';
 import type { Operator } from '../types';
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
+
+function isIOS() {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) && !(window as unknown as Record<string, unknown>).MSStream;
+}
+
+function isInStandaloneMode() {
+  return ('standalone' in window.navigator) && (window.navigator as unknown as Record<string, boolean>).standalone === true
+    || window.matchMedia('(display-mode: standalone)').matches;
+}
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const [sicilNo, setSicilNo] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [showIOSHint, setShowIOSHint] = useState(false);
+  const promptRef = useRef<BeforeInstallPromptEvent | null>(null);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      e.preventDefault();
+      promptRef.current = e as BeforeInstallPromptEvent;
+      setInstallPrompt(e as BeforeInstallPromptEvent);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (promptRef.current) {
+      await promptRef.current.prompt();
+      const { outcome } = await promptRef.current.userChoice;
+      if (outcome === 'accepted') setInstallPrompt(null);
+    } else if (isIOS()) {
+      setShowIOSHint(h => !h);
+    }
+  };
 
   // Oturum varsa doğrudan yönlendir
   useEffect(() => {
@@ -122,6 +159,29 @@ export default function LoginPage() {
             </button>
           </form>
         </div>
+
+        {/* Ana Ekrana Ekle */}
+        {!isInStandaloneMode() && (installPrompt || isIOS()) && (
+          <div className="space-y-2">
+            <button
+              onClick={handleInstall}
+              className="w-full flex items-center justify-center gap-2 bg-white/15 border border-white/30 text-white font-medium py-3 rounded-xl text-sm active:scale-95 transition-transform"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v12m0 0l-3-3m3 3l3-3M4 20h16" />
+              </svg>
+              Ana Ekrana Ekle
+            </button>
+            {showIOSHint && (
+              <div className="bg-white/15 border border-white/30 rounded-xl px-4 py-3 text-white text-xs space-y-1">
+                <p className="font-semibold">iPhone / iPad için:</p>
+                <p>1. Alt çubuktaki <strong>Paylaş</strong> butonuna dokunun</p>
+                <p>2. <strong>"Ana Ekrana Ekle"</strong> seçeneğini seçin</p>
+                <p>3. Sağ üstten <strong>"Ekle"</strong> deyin</p>
+              </div>
+            )}
+          </div>
+        )}
 
         <p className="text-center text-white text-xs opacity-50">
           SASA Polyester A.Ş. © {new Date().getFullYear()}
