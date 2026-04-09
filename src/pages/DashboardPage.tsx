@@ -75,7 +75,7 @@ export default function DashboardPage() {
     setShowDoldurmadi(true);
     setLoadingDoldurmadi(true);
     const [{ data: operators }, { data: subs }] = await Promise.all([
-      supabase.from('operators').select('sicil_no, ad_soyad').eq('is_active', true),
+      supabase.from('operators').select('sicil_no, ad_soyad').eq('is_active', true).neq('role', 'uzman'),
       supabase.from('form_submissions').select('sicil_no').eq('form_date', selectedDate),
     ]);
     const dolduranlar = new Set((subs ?? []).map((s: { sicil_no: string }) => s.sicil_no));
