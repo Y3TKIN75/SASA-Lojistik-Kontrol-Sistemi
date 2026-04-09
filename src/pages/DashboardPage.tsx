@@ -96,7 +96,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Üst Bar */}
-      <div className="bg-[#003F87] text-white px-4 py-3 sticky top-0 z-10">
+      <div className="bg-[#003F87] text-white px-4 pb-3 header-safe sticky top-0 z-10">
         <div className="flex items-center justify-between">
           <div>
             <div className="font-bold">Uzman Paneli</div>

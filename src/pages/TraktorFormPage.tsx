@@ -142,7 +142,7 @@ export default function TraktorFormPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Üst Bar */}
-      <div className="bg-[#003F87] text-white px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+      <div className="bg-[#003F87] text-white px-4 pb-3 header-safe flex items-center justify-between sticky top-0 z-10">
         <div>
           <div className="font-bold text-sm">Traktör Kontrol Formu</div>
           <div className="text-xs opacity-75">{session.ad_soyad} · {session.sicil_no}</div>
