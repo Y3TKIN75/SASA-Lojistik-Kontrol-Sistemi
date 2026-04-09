@@ -6,7 +6,6 @@ import type { CheckResult, Vardiya } from '../types';
 import { traktorChecklist } from '../data/checklists';
 import ChecklistItem from '../components/ChecklistItem';
 
-// Vardiya başlamadan 15 dakika önce bir sonraki vardiyaya geçiş yapar.
 // 23:45-07:44 → 00:00-08:00 | 07:45-15:44 → 08:00-16:00 | 15:45-23:44 → 16:00-00:00
 function detectVardiya(): Vardiya {
   const now = new Date();
@@ -34,11 +33,11 @@ export default function TraktorFormPage() {
 
   const [vardiya] = useState<Vardiya>(detectVardiya());
   const [answers, setAnswers] = useState<Record<number, CheckResult>>({});
+  const [notes, setNotes] = useState<Record<number, string>>({});
+  const [photos, setPhotos] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [alreadySubmitted, setAlreadySubmitted] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
@@ -49,25 +48,36 @@ export default function TraktorFormPage() {
     return () => { window.removeEventListener('online', onOnline); window.removeEventListener('offline', onOffline); };
   }, []);
 
-  // Mükerrer kontrol
+  // Mükerrer kontrol — form doldurulmuşsa Ana Ekran'a yönlendir
   useEffect(() => {
     const checkDuplicate = async () => {
       setChecking(true);
       const { data } = await supabase
         .from('form_submissions')
-        .select('id, submitted_at')
+        .select('id')
         .eq('sicil_no', session.sicil_no)
         .eq('vardiya', vardiya)
         .eq('form_date', getFormDate())
         .maybeSingle();
       setChecking(false);
-      setAlreadySubmitted(!!data);
+      if (data) navigate('/home/traktor', { replace: true });
     };
     checkDuplicate();
-  }, [vardiya, session.sicil_no]);
+  }, [vardiya, session.sicil_no, navigate]);
 
   const handleAnswer = (id: number, value: CheckResult) => {
     setAnswers(prev => ({ ...prev, [id]: value }));
+  };
+
+  const handleNoteChange = (id: number, note: string) => {
+    setNotes(prev => ({ ...prev, [id]: note }));
+  };
+
+  const handlePhotoChange = (id: number, photo: string | null) => {
+    setPhotos(prev => {
+      if (photo === null) { const next = { ...prev }; delete next[id]; return next; }
+      return { ...prev, [id]: photo };
+    });
   };
 
   const allAnswered = traktorChecklist.every(item => answers[item.id] !== undefined);
@@ -84,6 +94,8 @@ export default function TraktorFormPage() {
       soru: item.soru,
       tur: item.tur,
       sonuc: answers[item.id],
+      aciklama: answers[item.id] === 'uygun_degil' ? (notes[item.id] || null) : null,
+      foto: answers[item.id] === 'uygun_degil' ? (photos[item.id] || null) : null,
     }));
 
     const { error: dbError } = await supabase.from('form_submissions').insert({
@@ -100,14 +112,14 @@ export default function TraktorFormPage() {
 
     if (dbError) {
       if (dbError.code === '23505') {
-        setAlreadySubmitted(true);
+        navigate('/home/traktor', { replace: true });
         return;
       }
       setError('Form gönderilemedi: ' + dbError.message);
       return;
     }
 
-    setSubmitted(true);
+    navigate('/home/traktor', { replace: true });
   };
 
   const handleLogout = () => {
@@ -115,33 +127,8 @@ export default function TraktorFormPage() {
     navigate('/', { replace: true });
   };
 
-  // Başarı ekranı
-  if (submitted) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4">
-        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-sm w-full text-center space-y-4">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-            <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <h2 className="text-2xl font-bold text-gray-800">Form Gönderildi!</h2>
-          <p className="text-gray-500">Traktör kontrol formunuz başarıyla kaydedildi.</p>
-          <p className="text-sm text-gray-400">Vardiya: {vardiya}</p>
-          <button
-            onClick={handleLogout}
-            className="w-full bg-[#003F87] text-white font-bold py-4 rounded-xl mt-2"
-          >
-            Çıkış Yap
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Üst Bar */}
       <div className="bg-[#003F87] text-white px-4 pb-3 header-safe flex items-center justify-between sticky top-0 z-10">
         <div>
           <div className="font-bold text-sm">Traktör Kontrol Formu</div>
@@ -159,7 +146,6 @@ export default function TraktorFormPage() {
       )}
 
       <div className="flex-1 px-4 py-4 space-y-4 max-w-lg mx-auto w-full">
-        {/* Personel Bilgileri */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 space-y-3">
           <h2 className="font-bold text-gray-700 text-sm uppercase tracking-wide">1. Personel Bilgileri</h2>
           <div className="flex justify-between text-sm">
@@ -172,21 +158,12 @@ export default function TraktorFormPage() {
           </div>
         </div>
 
-        {/* Mükerrer uyarı */}
         {checking && (
           <div className="bg-gray-100 rounded-xl p-4 text-center text-sm text-gray-500">Kontrol ediliyor...</div>
         )}
 
-        {alreadySubmitted && !checking && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center space-y-2">
-            <div className="text-amber-700 font-semibold">Bu vardiya için form zaten gönderilmiş.</div>
-            <div className="text-sm text-amber-600">Bu vardiyada daha önce form kaydı oluşturdunuz.</div>
-          </div>
-        )}
-
-        {!alreadySubmitted && !checking && (
+        {!checking && (
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Kontrol Listesi */}
             <div className="space-y-1">
               <h2 className="font-bold text-gray-700 text-sm uppercase tracking-wide px-1">2. Kontrol Listesi</h2>
               <p className="text-xs text-gray-400 px-1">Her madde için Uygun / Uygun Değil seçiniz</p>
@@ -198,10 +175,13 @@ export default function TraktorFormPage() {
                 item={item}
                 value={answers[item.id]}
                 onChange={handleAnswer}
+                noteValue={notes[item.id]}
+                onNoteChange={handleNoteChange}
+                photoValue={photos[item.id]}
+                onPhotoChange={handlePhotoChange}
               />
             ))}
 
-            {/* Uyarılar */}
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-1">
               <h2 className="font-bold text-amber-800 text-sm uppercase tracking-wide">3. Uyarılar</h2>
               <ul className="text-xs text-amber-700 space-y-1 list-disc list-inside">

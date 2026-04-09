@@ -15,6 +15,7 @@ export interface ChecklistItemResult {
   tur: CheckType;
   sonuc: CheckResult;
   aciklama?: string | null;
+  foto?: string | null;
 }
 
 export interface Operator {

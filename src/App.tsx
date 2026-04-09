@@ -3,6 +3,9 @@ import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import TraktorFormPage from './pages/TraktorFormPage';
 import ForkliftFormPage from './pages/ForkliftFormPage';
+import ForkliftHomePage from './pages/ForkliftHomePage';
+import TraktorHomePage from './pages/TraktorHomePage';
+import MazotFormPage from './pages/MazotFormPage';
 import UzmanLoginPage from './pages/UzmanLoginPage';
 import DashboardPage from './pages/DashboardPage';
 import OperatorManagementPage from './pages/OperatorManagementPage';
@@ -27,6 +30,33 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={['forklift']}>
               <ForkliftFormPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/home/forklift"
+          element={
+            <ProtectedRoute allowedRoles={['forklift']}>
+              <ForkliftHomePage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/home/traktor"
+          element={
+            <ProtectedRoute allowedRoles={['traktor']}>
+              <TraktorHomePage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/form/mazot"
+          element={
+            <ProtectedRoute allowedRoles={['traktor', 'forklift']}>
+              <MazotFormPage />
             </ProtectedRoute>
           }
         />

@@ -35,11 +35,10 @@ export default function ForkliftFormPage() {
   const [sonKayitSaat, setSonKayitSaat] = useState<number | null>(null);
   const [answers, setAnswers] = useState<Record<number, CheckResult>>({});
   const [notes, setNotes] = useState<Record<number, string>>({});
+  const [photos, setPhotos] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [alreadySubmitted, setAlreadySubmitted] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
@@ -50,7 +49,7 @@ export default function ForkliftFormPage() {
     return () => { window.removeEventListener('online', onOnline); window.removeEventListener('offline', onOffline); };
   }, []);
 
-  // Mükerrer kontrol
+  // Mükerrer kontrol — form doldurulmuşsa Ana Ekran'a yönlendir
   useEffect(() => {
     const checkDuplicate = async () => {
       setChecking(true);
@@ -62,10 +61,10 @@ export default function ForkliftFormPage() {
         .eq('form_date', getFormDate())
         .maybeSingle();
       setChecking(false);
-      setAlreadySubmitted(!!data);
+      if (data) navigate('/home/forklift', { replace: true });
     };
     checkDuplicate();
-  }, [vardiya, session.sicil_no]);
+  }, [vardiya, session.sicil_no, navigate]);
 
   const handleForkliftNoChange = async (no: string) => {
     setForkliftNo(no);
@@ -89,6 +88,13 @@ export default function ForkliftFormPage() {
     setNotes(prev => ({ ...prev, [id]: note }));
   };
 
+  const handlePhotoChange = (id: number, photo: string | null) => {
+    setPhotos(prev => {
+      if (photo === null) { const next = { ...prev }; delete next[id]; return next; }
+      return { ...prev, [id]: photo };
+    });
+  };
+
   const allAnswered =
     forkliftNo.trim() !== '' &&
     calismaSaati.trim() !== '' &&
@@ -107,6 +113,7 @@ export default function ForkliftFormPage() {
       tur: item.tur,
       sonuc: answers[item.id],
       aciklama: answers[item.id] === 'uygun_degil' ? (notes[item.id] || null) : null,
+      foto: answers[item.id] === 'uygun_degil' ? (photos[item.id] || null) : null,
     }));
 
     const { error: dbError } = await supabase.from('form_submissions').insert({
@@ -125,52 +132,20 @@ export default function ForkliftFormPage() {
 
     if (dbError) {
       if (dbError.code === '23505') {
-        setAlreadySubmitted(true);
+        navigate('/home/forklift', { replace: true });
         return;
       }
       setError('Form gönderilemedi: ' + dbError.message);
       return;
     }
 
-    setSubmitted(true);
+    navigate('/home/forklift', { replace: true });
   };
 
   const handleLogout = () => {
     clearSession();
     navigate('/', { replace: true });
   };
-
-  if (submitted) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4">
-        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-sm w-full text-center space-y-4">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-            <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <h2 className="text-2xl font-bold text-gray-800">Form Gönderildi!</h2>
-          <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm text-left">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Ad Soyad</span>
-              <span className="font-medium text-gray-800">{session.ad_soyad}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Vardiya</span>
-              <span className="font-semibold text-[#003F87]">{vardiya}</span>
-            </div>
-          </div>
-          <p className="text-[#003F87] font-bold text-lg">İyi çalışmalar, {session.ad_soyad.split(' ')[0]}!</p>
-          <button
-            onClick={() => navigate('/', { replace: true })}
-            className="w-full bg-[#003F87] text-white font-bold py-4 rounded-xl mt-2"
-          >
-            Tamam
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -239,18 +214,10 @@ export default function ForkliftFormPage() {
           <div className="bg-gray-100 rounded-xl p-4 text-center text-sm text-gray-500">Kontrol ediliyor...</div>
         )}
 
-        {alreadySubmitted && !checking && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center space-y-2">
-            <div className="text-amber-700 font-semibold">Bu vardiya için form zaten gönderilmiş.</div>
-            <div className="text-sm text-amber-600">Bu vardiyada daha önce form kaydı oluşturdunuz.</div>
-          </div>
-        )}
-
-        {!alreadySubmitted && !checking && (
+        {!checking && (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1">
               <h2 className="font-bold text-gray-700 text-sm uppercase tracking-wide px-1">3. Kontrol Listesi</h2>
-
               <p className="text-xs text-gray-400 px-1">Her madde için Evet / Hayır seçiniz</p>
             </div>
 
@@ -263,6 +230,8 @@ export default function ForkliftFormPage() {
                 yesNo
                 noteValue={notes[item.id]}
                 onNoteChange={handleNoteChange}
+                photoValue={photos[item.id]}
+                onPhotoChange={handlePhotoChange}
               />
             ))}
 
