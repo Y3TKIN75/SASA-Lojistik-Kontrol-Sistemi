@@ -19,11 +19,13 @@ const turColors: Record<CheckType, string> = {
   'Genel':     'bg-gray-100 text-gray-700',
 };
 
-function compressImage(file: File, maxSize = 600, quality = 0.6): Promise<string> {
+function compressImage(file: File, maxSize = 600, quality = 0.6): Promise<string | null> {
   return new Promise((resolve) => {
     const reader = new FileReader();
+    reader.onerror = () => resolve(null);
     reader.onload = (e) => {
       const img = new Image();
+      img.onerror = () => resolve(null);
       img.onload = () => {
         let { width, height } = img;
         if (width > maxSize || height > maxSize) {
@@ -49,6 +51,7 @@ export default function ChecklistItem({ item, value, onChange, yesNo = false, no
     const file = e.target.files?.[0];
     if (!file || !onPhotoChange) return;
     const compressed = await compressImage(file);
+    if (compressed === null) return; // bozuk/desteklenmeyen dosya, sessizce geç
     onPhotoChange(item.id, compressed);
     e.target.value = '';
   };

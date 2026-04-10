@@ -3,8 +3,12 @@ import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import TraktorFormPage from './pages/TraktorFormPage';
 import ForkliftFormPage from './pages/ForkliftFormPage';
+import TirFormPage from './pages/TirFormPage';
+import KalmarFormPage from './pages/KalmarFormPage';
 import ForkliftHomePage from './pages/ForkliftHomePage';
 import TraktorHomePage from './pages/TraktorHomePage';
+import TirHomePage from './pages/TirHomePage';
+import KalmarHomePage from './pages/KalmarHomePage';
 import MazotFormPage from './pages/MazotFormPage';
 import UzmanLoginPage from './pages/UzmanLoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -35,6 +39,24 @@ export default function App() {
         />
 
         <Route
+          path="/form/tir"
+          element={
+            <ProtectedRoute allowedRoles={['tir']}>
+              <TirFormPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/form/kalmar"
+          element={
+            <ProtectedRoute allowedRoles={['kalmar']}>
+              <KalmarFormPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/home/forklift"
           element={
             <ProtectedRoute allowedRoles={['forklift']}>
@@ -53,9 +75,27 @@ export default function App() {
         />
 
         <Route
+          path="/home/tir"
+          element={
+            <ProtectedRoute allowedRoles={['tir']}>
+              <TirHomePage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/home/kalmar"
+          element={
+            <ProtectedRoute allowedRoles={['kalmar']}>
+              <KalmarHomePage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/form/mazot"
           element={
-            <ProtectedRoute allowedRoles={['traktor', 'forklift']}>
+            <ProtectedRoute allowedRoles={['traktor', 'forklift', 'tir', 'kalmar']}>
               <MazotFormPage />
             </ProtectedRoute>
           }

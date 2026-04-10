@@ -53,6 +53,8 @@ export default function LoginPage() {
     if (session) {
       if (session.role === 'traktor') navigate('/form/traktor', { replace: true });
       else if (session.role === 'forklift') navigate('/form/forklift', { replace: true });
+      else if (session.role === 'tir') navigate('/form/tir', { replace: true });
+      else if (session.role === 'kalmar') navigate('/form/kalmar', { replace: true });
       else if (session.role === 'uzman') navigate('/uzman/dashboard', { replace: true });
     }
   }, [navigate]);
@@ -101,7 +103,9 @@ export default function LoginPage() {
     });
 
     if (operator.role === 'traktor') navigate('/form/traktor', { replace: true });
-    else navigate('/form/forklift', { replace: true });
+    else if (operator.role === 'forklift') navigate('/form/forklift', { replace: true });
+    else if (operator.role === 'tir') navigate('/form/tir', { replace: true });
+    else navigate('/form/kalmar', { replace: true });
   };
 
   return (

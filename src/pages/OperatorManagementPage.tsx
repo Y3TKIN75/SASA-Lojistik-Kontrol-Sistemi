@@ -7,12 +7,16 @@ import type { Operator, Role } from '../types';
 const ROLE_LABELS: Record<Role, string> = {
   traktor: 'Traktör',
   forklift: 'Forklift',
+  tir: 'Tır',
+  kalmar: 'Kalmar',
   uzman: 'Uzman',
 };
 
 const ROLE_COLORS: Record<Role, string> = {
   traktor: 'bg-blue-100 text-blue-700',
   forklift: 'bg-purple-100 text-purple-700',
+  tir: 'bg-green-100 text-green-700',
+  kalmar: 'bg-orange-100 text-orange-700',
   uzman: 'bg-amber-100 text-amber-700',
 };
 
@@ -222,6 +226,8 @@ export default function OperatorManagementPage() {
                 >
                   <option value="traktor">Traktör Operatörü</option>
                   <option value="forklift">Forklift Operatörü</option>
+                  <option value="tir">Tır Operatörü</option>
+                  <option value="kalmar">Kalmar Operatörü</option>
                   <option value="uzman">Uzman / Yönetici</option>
                 </select>
               </div>

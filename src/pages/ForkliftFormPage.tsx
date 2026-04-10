@@ -14,10 +14,11 @@ function detectVardiya(): Vardiya {
   return '16:00-00:00';
 }
 
+// 23:45'ten sonra vardiya 00:00-08:00'e geçer, form tarihi ertesi güne ait.
 function getFormDate(): string {
   const now = new Date();
   const m = now.getHours() * 60 + now.getMinutes();
-  if (m >= 23 * 60 + 30) {
+  if (m >= 23 * 60 + 45) {
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
     return tomorrow.toISOString().split('T')[0];

@@ -8,6 +8,22 @@ import ShiftBadge from '../components/ShiftBadge';
 
 const VARDIYAS: Vardiya[] = ['00:00-08:00', '08:00-16:00', '16:00-00:00'];
 
+type VehicleTab = 'traktor' | 'forklift' | 'kalmar' | 'tir';
+
+const VEHICLE_TABS: { key: VehicleTab; label: string }[] = [
+  { key: 'traktor', label: 'Traktör' },
+  { key: 'forklift', label: 'Forklift' },
+  { key: 'kalmar', label: 'Kalmar' },
+  { key: 'tir', label: 'Tır' },
+];
+
+const VEHICLE_LABELS: Record<string, string> = {
+  traktor: 'Traktör',
+  forklift: 'Forklift',
+  kalmar: 'Kalmar',
+  tir: 'Tır',
+};
+
 function getToday(): string {
   return new Date().toISOString().split('T')[0];
 }
@@ -16,18 +32,27 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const session = getSession()!;
 
+  const [selectedVehicle, setSelectedVehicle] = useState<VehicleTab>('traktor');
   const [selectedDate, setSelectedDate] = useState(getToday());
   const [submissions, setSubmissions] = useState<FormSubmission[]>([]);
   const [loadingSubs, setLoadingSubs] = useState(false);
   const [selectedSubmission, setSelectedSubmission] = useState<FormSubmission | null>(null);
+
+  // Forklift Saatleri
   const [showForkliftSaatleri, setShowForkliftSaatleri] = useState(false);
   const [forkliftSaatleri, setForkliftSaatleri] = useState<{ forklift_no: string; calisma_saati: string }[]>([]);
   const [loadingFS, setLoadingFS] = useState(false);
+
+  // Kalmar Saatleri
+  const [showKalmarSaatleri, setShowKalmarSaatleri] = useState(false);
+  const [kalmarSaatleri, setKalmarSaatleri] = useState<{ forklift_no: string; calisma_saati: string }[]>([]);
+  const [loadingKS, setLoadingKS] = useState(false);
+
+  // Form Doldurmadı
   const [showDoldurmadi, setShowDoldurmadi] = useState(false);
   const [doldurmadi, setDoldurmadi] = useState<{ ad_soyad: string; sicil_no: string }[]>([]);
   const [loadingDoldurmadi, setLoadingDoldurmadi] = useState(false);
 
-  // Seçilen tarihe göre formları yükle
   useEffect(() => {
     const fetchSubmissions = async () => {
       setLoadingSubs(true);
@@ -35,12 +60,13 @@ export default function DashboardPage() {
         .from('form_submissions')
         .select('*')
         .eq('form_date', selectedDate)
+        .eq('vehicle_type', selectedVehicle)
         .order('submitted_at');
       setSubmissions((data as FormSubmission[]) ?? []);
       setLoadingSubs(false);
     };
     fetchSubmissions();
-  }, [selectedDate]);
+  }, [selectedDate, selectedVehicle]);
 
   const handleLogout = () => {
     clearSession();
@@ -55,9 +81,9 @@ export default function DashboardPage() {
       .select('forklift_no, calisma_saati, submitted_at')
       .eq('vehicle_type', 'forklift')
       .not('forklift_no', 'is', null)
-      .order('submitted_at', { ascending: false });
+      .order('submitted_at', { ascending: false })
+      .limit(500);
 
-    // Her forklift için en son kaydı al
     const map = new Map<string, string>();
     for (const row of (data ?? [])) {
       if (row.forklift_no && !map.has(row.forklift_no)) {
@@ -71,12 +97,36 @@ export default function DashboardPage() {
     setLoadingFS(false);
   };
 
+  const handleOpenKalmarSaatleri = async () => {
+    setShowKalmarSaatleri(true);
+    setLoadingKS(true);
+    const { data } = await supabase
+      .from('form_submissions')
+      .select('forklift_no, calisma_saati, submitted_at')
+      .eq('vehicle_type', 'kalmar')
+      .not('forklift_no', 'is', null)
+      .order('submitted_at', { ascending: false })
+      .limit(100);
+
+    const map = new Map<string, string>();
+    for (const row of (data ?? [])) {
+      if (row.forklift_no && !map.has(row.forklift_no)) {
+        map.set(row.forklift_no, row.calisma_saati ?? '-');
+      }
+    }
+    const sorted = Array.from(map.entries())
+      .map(([forklift_no, calisma_saati]) => ({ forklift_no, calisma_saati }))
+      .sort((a, b) => a.forklift_no.localeCompare(b.forklift_no, 'tr'));
+    setKalmarSaatleri(sorted);
+    setLoadingKS(false);
+  };
+
   const handleOpenDoldurmadi = async () => {
     setShowDoldurmadi(true);
     setLoadingDoldurmadi(true);
     const [{ data: operators }, { data: subs }] = await Promise.all([
-      supabase.from('operators').select('sicil_no, ad_soyad').eq('is_active', true).neq('role', 'uzman'),
-      supabase.from('form_submissions').select('sicil_no').eq('form_date', selectedDate),
+      supabase.from('operators').select('sicil_no, ad_soyad').eq('is_active', true).eq('role', selectedVehicle),
+      supabase.from('form_submissions').select('sicil_no').eq('form_date', selectedDate).eq('vehicle_type', selectedVehicle),
     ]);
     const dolduranlar = new Set((subs ?? []).map((s: { sicil_no: string }) => s.sicil_no));
     const liste = (operators ?? [])
@@ -86,7 +136,6 @@ export default function DashboardPage() {
     setLoadingDoldurmadi(false);
   };
 
-  // Özet sayılar
   const totalFilled = submissions.length;
   const uniqueOperators = new Set(submissions.map(s => s.sicil_no)).size;
   const hasIssuesCount = submissions.filter(s =>
@@ -96,8 +145,8 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Üst Bar */}
-      <div className="bg-[#003F87] text-white px-4 pb-3 header-safe sticky top-0 z-10">
-        <div className="flex items-center justify-between">
+      <div className="bg-[#003F87] text-white px-4 pb-0 header-safe sticky top-0 z-10">
+        <div className="flex items-center justify-between pb-2">
           <div>
             <div className="font-bold">Uzman Paneli</div>
             <div className="text-xs opacity-75">{session.ad_soyad}</div>
@@ -114,16 +163,45 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
+
+        {/* Araç Seçim Sekmeleri */}
+        <div className="flex gap-1 pb-2">
+          {VEHICLE_TABS.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setSelectedVehicle(tab.key)}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                selectedVehicle === tab.key
+                  ? 'bg-white text-[#003F87]'
+                  : 'bg-white/15 text-white'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="px-4 py-4 space-y-4 max-w-2xl mx-auto w-full">
-        {/* Forklift Saatleri Butonu */}
-        <button
-          onClick={handleOpenForkliftSaatleri}
-          className="w-full bg-white border-2 border-[#003F87] text-[#003F87] font-bold py-3 rounded-xl text-sm active:scale-95 transition-transform"
-        >
-          Forklift Saatleri
-        </button>
+        {/* Forklift Saatleri Butonu — sadece Forklift sekmesinde */}
+        {selectedVehicle === 'forklift' && (
+          <button
+            onClick={handleOpenForkliftSaatleri}
+            className="w-full bg-white border-2 border-[#003F87] text-[#003F87] font-bold py-3 rounded-xl text-sm active:scale-95 transition-transform"
+          >
+            Forklift Saatleri
+          </button>
+        )}
+
+        {/* Kalmar Saatleri Butonu — sadece Kalmar sekmesinde */}
+        {selectedVehicle === 'kalmar' && (
+          <button
+            onClick={handleOpenKalmarSaatleri}
+            className="w-full bg-white border-2 border-[#003F87] text-[#003F87] font-bold py-3 rounded-xl text-sm active:scale-95 transition-transform"
+          >
+            Kalmar Saatleri
+          </button>
+        )}
 
         {/* Tarih Filtresi */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
@@ -182,7 +260,7 @@ export default function DashboardPage() {
                           <div>
                             <div className="text-sm font-medium text-gray-800">{sub.ad_soyad}</div>
                             <div className="text-xs text-gray-400">
-                              {sub.sicil_no} · {sub.vehicle_type === 'traktor' ? 'Traktör' : 'Forklift'} ·{' '}
+                              {sub.sicil_no} · {VEHICLE_LABELS[sub.vehicle_type] ?? sub.vehicle_type} ·{' '}
                               {new Date(sub.submitted_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
                             </div>
                           </div>
@@ -231,7 +309,7 @@ export default function DashboardPage() {
             <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
               <div>
                 <div className="font-bold text-gray-800">Form Doldurmadı</div>
-                <div className="text-xs text-gray-500">{selectedDate}</div>
+                <div className="text-xs text-gray-500">{VEHICLE_LABELS[selectedVehicle]} · {selectedDate}</div>
               </div>
               <button
                 onClick={() => setShowDoldurmadi(false)}
@@ -333,6 +411,75 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Kalmar Saatleri Modalı */}
+      {showKalmarSaatleri && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center"
+          onClick={() => setShowKalmarSaatleri(false)}
+        >
+          <div
+            className="bg-white rounded-t-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+              <div className="font-bold text-gray-800">Kalmar Saatleri</div>
+              <div className="flex items-center gap-2">
+                {kalmarSaatleri.length > 0 && (
+                  <button
+                    onClick={() => {
+                      const wsData = [
+                        ['Kalmar No', 'Çalışma Saati'],
+                        ...kalmarSaatleri.map(r => [r.forklift_no, Number(r.calisma_saati)]),
+                      ];
+                      const ws = XLSX.utils.aoa_to_sheet(wsData);
+                      ws['!cols'] = [{ wch: 14 }, { wch: 16 }];
+                      const wb = XLSX.utils.book_new();
+                      XLSX.utils.book_append_sheet(wb, ws, 'Kalmar Saatleri');
+                      XLSX.writeFile(wb, `kalmar-saatleri-${new Date().toISOString().split('T')[0]}.xlsx`);
+                    }}
+                    className="flex items-center gap-1.5 bg-green-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg active:scale-95 transition-transform"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Excel
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowKalmarSaatleri(false)}
+                  className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center"
+                >
+                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="px-4 py-3">
+              {loadingKS ? (
+                <div className="text-center py-8 text-gray-400 text-sm">Yükleniyor...</div>
+              ) : kalmarSaatleri.length === 0 ? (
+                <div className="text-center py-8 text-gray-400 text-sm">Henüz veri yok.</div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  <div className="flex justify-between py-2 text-xs font-bold text-gray-400 uppercase">
+                    <span>Kalmar No</span>
+                    <span>Çalışma Saati</span>
+                  </div>
+                  {kalmarSaatleri.map(row => (
+                    <div key={row.forklift_no} className="flex justify-between py-3 text-sm">
+                      <span className="font-semibold text-gray-700">{row.forklift_no}</span>
+                      <span className="font-bold text-[#003F87]">{row.calisma_saati}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="h-6" />
+          </div>
+        </div>
+      )}
+
       {/* Form Detay Modalı */}
       {selectedSubmission && (
         <div
@@ -347,7 +494,7 @@ export default function DashboardPage() {
               <div>
                 <div className="font-bold text-gray-800">{selectedSubmission.ad_soyad}</div>
                 <div className="text-xs text-gray-500">
-                  {selectedSubmission.vehicle_type === 'traktor' ? 'Traktör' : 'Forklift'} ·{' '}
+                  {VEHICLE_LABELS[selectedSubmission.vehicle_type] ?? selectedSubmission.vehicle_type} ·{' '}
                   <ShiftBadge vardiya={selectedSubmission.vardiya} /> ·{' '}
                   {new Date(selectedSubmission.submitted_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
                 </div>
@@ -362,10 +509,10 @@ export default function DashboardPage() {
               </button>
             </div>
             <div className="px-4 py-4 space-y-3">
-              {selectedSubmission.vehicle_type === 'forklift' && (
+              {(selectedSubmission.vehicle_type === 'forklift' || selectedSubmission.vehicle_type === 'kalmar') && (
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-1 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Forklift No</span>
+                    <span className="text-gray-500">{VEHICLE_LABELS[selectedSubmission.vehicle_type]} No</span>
                     <span className="font-semibold text-gray-800">{selectedSubmission.forklift_no ?? '-'}</span>
                   </div>
                   <div className="flex justify-between">

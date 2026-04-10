@@ -1,4 +1,4 @@
-export type Role = 'traktor' | 'forklift' | 'uzman';
+export type Role = 'traktor' | 'forklift' | 'tir' | 'kalmar' | 'uzman';
 export type Vardiya = '00:00-08:00' | '08:00-16:00' | '16:00-00:00';
 export type CheckResult = 'uygun' | 'uygun_degil';
 export type CheckType = 'Görsel' | 'Fonksiyon' | 'Kontrol' | 'Genel';
@@ -34,7 +34,7 @@ export interface FormSubmission {
   sicil_no: string;
   ad_soyad: string;
   vardiya: Vardiya;
-  vehicle_type: 'traktor' | 'forklift';
+  vehicle_type: 'traktor' | 'forklift' | 'tir' | 'kalmar';
   checklist: ChecklistItemResult[];
   form_date: string;
   submitted_at: string;

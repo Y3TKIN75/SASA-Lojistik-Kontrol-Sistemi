@@ -3,10 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getSession, clearSession } from '../lib/session';
 import type { CheckResult, Vardiya } from '../types';
-import { traktorChecklist } from '../data/checklists';
+import { tirChecklist } from '../data/checklists';
 import ChecklistItem from '../components/ChecklistItem';
 
-// 23:45-07:44 → 00:00-08:00 | 07:45-15:44 → 08:00-16:00 | 15:45-23:44 → 16:00-00:00
 function detectVardiya(): Vardiya {
   const now = new Date();
   const m = now.getHours() * 60 + now.getMinutes();
@@ -15,7 +14,6 @@ function detectVardiya(): Vardiya {
   return '16:00-00:00';
 }
 
-// 23:45'ten sonra vardiya 00:00-08:00'e geçer, form tarihi ertesi güne ait.
 function getFormDate(): string {
   const now = new Date();
   const m = now.getHours() * 60 + now.getMinutes();
@@ -27,7 +25,7 @@ function getFormDate(): string {
   return now.toISOString().split('T')[0];
 }
 
-export default function TraktorFormPage() {
+export default function TirFormPage() {
   const navigate = useNavigate();
   const session = getSession()!;
 
@@ -48,7 +46,6 @@ export default function TraktorFormPage() {
     return () => { window.removeEventListener('online', onOnline); window.removeEventListener('offline', onOffline); };
   }, []);
 
-  // Mükerrer kontrol — form doldurulmuşsa Ana Ekran'a yönlendir
   useEffect(() => {
     const checkDuplicate = async () => {
       setChecking(true);
@@ -60,7 +57,7 @@ export default function TraktorFormPage() {
         .eq('form_date', getFormDate())
         .maybeSingle();
       setChecking(false);
-      if (data) navigate('/home/traktor', { replace: true });
+      if (data) navigate('/home/tir', { replace: true });
     };
     checkDuplicate();
   }, [vardiya, session.sicil_no, navigate]);
@@ -80,7 +77,7 @@ export default function TraktorFormPage() {
     });
   };
 
-  const allAnswered = traktorChecklist.every(item => answers[item.id] !== undefined);
+  const allAnswered = tirChecklist.every(item => answers[item.id] !== undefined);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,7 +86,7 @@ export default function TraktorFormPage() {
     setLoading(true);
     setError(null);
 
-    const checklist = traktorChecklist.map(item => ({
+    const checklist = tirChecklist.map(item => ({
       id: item.id,
       soru: item.soru,
       tur: item.tur,
@@ -103,7 +100,7 @@ export default function TraktorFormPage() {
       sicil_no: session.sicil_no,
       ad_soyad: session.ad_soyad,
       vardiya,
-      vehicle_type: 'traktor',
+      vehicle_type: 'tir',
       checklist,
       form_date: getFormDate(),
     });
@@ -112,14 +109,14 @@ export default function TraktorFormPage() {
 
     if (dbError) {
       if (dbError.code === '23505') {
-        navigate('/home/traktor', { replace: true });
+        navigate('/home/tir', { replace: true });
         return;
       }
       setError('Form gönderilemedi: ' + dbError.message);
       return;
     }
 
-    navigate('/home/traktor', { replace: true });
+    navigate('/home/tir', { replace: true });
   };
 
   const handleLogout = () => {
@@ -131,7 +128,7 @@ export default function TraktorFormPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <div className="bg-[#003F87] text-white px-4 pb-3 header-safe flex items-center justify-between sticky top-0 z-10">
         <div>
-          <div className="font-bold text-sm">Traktör Kontrol Formu</div>
+          <div className="font-bold text-sm">Tır Kontrol Formu</div>
           <div className="text-xs opacity-75">{session.ad_soyad} · {session.sicil_no}</div>
         </div>
         <button onClick={handleLogout} className="text-xs opacity-75 bg-white/10 px-3 py-1.5 rounded-lg">
@@ -169,7 +166,7 @@ export default function TraktorFormPage() {
               <p className="text-xs text-gray-400 px-1">Her madde için Uygun / Uygun Değil seçiniz</p>
             </div>
 
-            {traktorChecklist.map(item => (
+            {tirChecklist.map(item => (
               <ChecklistItem
                 key={item.id}
                 item={item}
@@ -202,7 +199,7 @@ export default function TraktorFormPage() {
               disabled={loading || !allAnswered}
               className="w-full bg-[#003F87] text-white font-bold py-4 rounded-xl text-base disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition-transform shadow-md"
             >
-              {loading ? 'Gönderiliyor...' : `Formu Onayla (${Object.keys(answers).length}/${traktorChecklist.length})`}
+              {loading ? 'Gönderiliyor...' : `Formu Onayla (${Object.keys(answers).length}/${tirChecklist.length})`}
             </button>
 
             <div className="h-6" />
