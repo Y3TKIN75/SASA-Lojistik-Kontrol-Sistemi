@@ -537,6 +537,13 @@ export default function DashboardPage() {
                         Açıklama: {item.aciklama}
                       </p>
                     )}
+                    {item.sonuc === 'uygun_degil' && item.foto && (
+                      <img
+                        src={item.foto}
+                        alt="Fotoğraf"
+                        className="mt-2 w-full max-h-48 object-cover rounded-lg border border-red-200"
+                      />
+                    )}
                   </div>
                   <span className={`text-xs font-bold px-2 py-1 rounded-full shrink-0 ${
                     item.sonuc === 'uygun' ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'
