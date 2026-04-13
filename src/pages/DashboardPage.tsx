@@ -28,6 +28,12 @@ function getToday(): string {
   return new Date().toISOString().split('T')[0];
 }
 
+const AYLAR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+function formatAy(key: string): string {
+  const [yil, ay] = key.split('-');
+  return `${AYLAR[Number(ay) - 1]} ${yil}`;
+}
+
 export default function DashboardPage() {
   const navigate = useNavigate();
   const session = getSession()!;
@@ -38,6 +44,7 @@ export default function DashboardPage() {
   const [loadingSubs, setLoadingSubs] = useState(false);
   const [selectedSubmission, setSelectedSubmission] = useState<FormSubmission | null>(null);
   const [selectedMazot, setSelectedMazot] = useState<{
+    forklift_no?: string | null;
     kilometre?: string | null;
     litre?: string | null;
     calisma_saati?: string | null;
@@ -62,9 +69,21 @@ export default function DashboardPage() {
   const [showMazotAlim, setShowMazotAlim] = useState(false);
   const [mazotAlimList, setMazotAlimList] = useState<{ forklift_no: string; toplam: number }[]>([]);
   const [loadingMA, setLoadingMA] = useState(false);
-  const [mazotAlimDetay, setMazotAlimDetay] = useState<{
+  const [mazotAylik, setMazotAylik] = useState<{
     forklift_no: string;
-    rows: { form_date: string; calisma_saati: string | null; litre: string }[];
+    months: { key: string; label: string; toplam: number }[];
+  } | null>(null);
+  const [mazotDetay, setMazotDetay] = useState<{
+    forklift_no: string;
+    monthKey: string;
+    monthLabel: string;
+    rows: { id: string; form_date: string; calisma_saati: string | null; kilometre: string | null; litre: string }[];
+  } | null>(null);
+  const [editingRow, setEditingRow] = useState<{
+    id: string;
+    litre: string;
+    calisma_saati: string;
+    kilometre: string;
   } | null>(null);
 
   useEffect(() => {
@@ -140,7 +159,7 @@ export default function DashboardPage() {
     setSelectedMazot(null);
     const { data } = await supabase
       .from('mazot_submissions')
-      .select('kilometre, litre, calisma_saati')
+      .select('forklift_no, kilometre, litre, calisma_saati')
       .eq('sicil_no', sub.sicil_no)
       .eq('vardiya', sub.vardiya)
       .eq('form_date', sub.form_date)
@@ -151,7 +170,9 @@ export default function DashboardPage() {
 
   const handleOpenMazotAlim = async () => {
     setShowMazotAlim(true);
-    setMazotAlimDetay(null);
+    setMazotAylik(null);
+    setMazotDetay(null);
+    setEditingRow(null);
     setLoadingMA(true);
     const { data } = await supabase
       .from('mazot_submissions')
@@ -174,24 +195,73 @@ export default function DashboardPage() {
     setLoadingMA(false);
   };
 
-  const handleOpenMazotDetay = async (forklift_no: string) => {
+  const handleOpenMazotAylik = async (forklift_no: string) => {
     setLoadingMA(true);
+    setEditingRow(null);
     const { data } = await supabase
       .from('mazot_submissions')
-      .select('form_date, calisma_saati, litre')
+      .select('form_date, litre')
       .eq('vehicle_type', selectedVehicle)
       .eq('forklift_no', forklift_no)
       .order('form_date', { ascending: false });
 
-    setMazotAlimDetay({
-      forklift_no,
-      rows: (data ?? []).map((r: { form_date: string; calisma_saati: string | null; litre: string }) => ({
-        form_date: r.form_date,
-        calisma_saati: r.calisma_saati,
-        litre: r.litre,
-      })),
-    });
+    const map = new Map<string, number>();
+    for (const row of (data ?? [])) {
+      const key = (row.form_date as string).substring(0, 7);
+      map.set(key, (map.get(key) ?? 0) + Number(row.litre ?? 0));
+    }
+    const months = Array.from(map.entries())
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([key, toplam]) => ({ key, label: formatAy(key), toplam }));
+
+    setMazotAylik({ forklift_no, months });
     setLoadingMA(false);
+  };
+
+  const handleOpenMazotDetay = async (forklift_no: string, monthKey: string, monthLabel: string) => {
+    setLoadingMA(true);
+    setEditingRow(null);
+    const [yearStr, monthStr] = monthKey.split('-');
+    const year = Number(yearStr);
+    const month = Number(monthStr);
+    const nextYear = month === 12 ? year + 1 : year;
+    const nextMonth = month === 12 ? 1 : month + 1;
+    const nextMonthStart = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`;
+    const { data } = await supabase
+      .from('mazot_submissions')
+      .select('id, form_date, calisma_saati, kilometre, litre')
+      .eq('vehicle_type', selectedVehicle)
+      .eq('forklift_no', forklift_no)
+      .gte('form_date', monthKey + '-01')
+      .lt('form_date', nextMonthStart)
+      .order('form_date', { ascending: false });
+
+    setMazotDetay({ forklift_no, monthKey, monthLabel, rows: data ?? [] });
+    setLoadingMA(false);
+  };
+
+  const handleEditSave = async () => {
+    if (!editingRow || !mazotDetay) return;
+    const isKmBased = selectedVehicle === 'traktor' || selectedVehicle === 'tir';
+    const updateFields = isKmBased
+      ? { litre: editingRow.litre, kilometre: editingRow.kilometre || null }
+      : { litre: editingRow.litre, calisma_saati: editingRow.calisma_saati || null };
+    await supabase
+      .from('mazot_submissions')
+      .update(updateFields)
+      .eq('id', editingRow.id);
+    setMazotDetay(prev => prev && {
+      ...prev,
+      rows: prev.rows.map(r => r.id === editingRow.id
+        ? { ...r, litre: editingRow.litre, ...(isKmBased ? { kilometre: editingRow.kilometre || null } : { calisma_saati: editingRow.calisma_saati || null }) }
+        : r),
+    });
+    setEditingRow(null);
+  };
+
+  const handleDelete = async (id: string) => {
+    await supabase.from('mazot_submissions').delete().eq('id', id);
+    setMazotDetay(prev => prev && { ...prev, rows: prev.rows.filter(r => r.id !== id) });
   };
 
   const handleOpenDoldurmadi = async () => {
@@ -276,8 +346,9 @@ export default function DashboardPage() {
           </button>
         )}
 
-        {/* Mazot Alım Butonu — Forklift ve Kalmar sekmelerinde */}
-        {(selectedVehicle === 'forklift' || selectedVehicle === 'kalmar') && (
+        {/* Mazot Alım Butonu */}
+        {(selectedVehicle === 'forklift' || selectedVehicle === 'kalmar' ||
+          selectedVehicle === 'traktor' || selectedVehicle === 'tir') && (
           <button
             onClick={handleOpenMazotAlim}
             className="w-full bg-white border-2 border-amber-400 text-amber-700 font-bold py-3 rounded-xl text-sm active:scale-95 transition-transform"
@@ -607,6 +678,15 @@ export default function DashboardPage() {
               {selectedMazot && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1 text-sm">
                   <div className="text-xs font-bold text-amber-700 uppercase mb-1">Mazot Bilgisi</div>
+                  {selectedMazot.forklift_no && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">
+                        {selectedSubmission?.vehicle_type === 'traktor' || selectedSubmission?.vehicle_type === 'tir'
+                          ? 'Plaka' : 'Araç No'}
+                      </span>
+                      <span className="font-semibold text-gray-800">{selectedMazot.forklift_no}</span>
+                    </div>
+                  )}
                   {selectedMazot.kilometre && (
                     <div className="flex justify-between">
                       <span className="text-gray-500">Kilometre</span>
@@ -668,7 +748,7 @@ export default function DashboardPage() {
       {showMazotAlim && (
         <div
           className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center"
-          onClick={() => { setShowMazotAlim(false); setMazotAlimDetay(null); }}
+          onClick={() => { setShowMazotAlim(false); setMazotAylik(null); setMazotDetay(null); setEditingRow(null); }}
         >
           <div
             className="bg-white rounded-t-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto"
@@ -676,24 +756,35 @@ export default function DashboardPage() {
           >
             <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                {mazotAlimDetay && (
+                {mazotDetay ? (
                   <button
-                    onClick={() => setMazotAlimDetay(null)}
+                    onClick={() => { setMazotDetay(null); setEditingRow(null); }}
                     className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center mr-1"
                   >
                     <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                     </svg>
                   </button>
-                )}
+                ) : mazotAylik ? (
+                  <button
+                    onClick={() => setMazotAylik(null)}
+                    className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center mr-1"
+                  >
+                    <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                ) : null}
                 <div className="font-bold text-gray-800">
-                  {mazotAlimDetay
-                    ? `${mazotAlimDetay.forklift_no} — Mazot Geçmişi`
+                  {mazotDetay
+                    ? `${mazotDetay.forklift_no} — ${mazotDetay.monthLabel}`
+                    : mazotAylik
+                    ? `${mazotAylik.forklift_no} — Aylık Özet`
                     : `${VEHICLE_LABELS[selectedVehicle]} Mazot Alım`}
                 </div>
               </div>
               <button
-                onClick={() => { setShowMazotAlim(false); setMazotAlimDetay(null); }}
+                onClick={() => { setShowMazotAlim(false); setMazotAylik(null); setMazotDetay(null); setEditingRow(null); }}
                 className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center"
               >
                 <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -704,35 +795,114 @@ export default function DashboardPage() {
             <div className="px-4 py-3">
               {loadingMA ? (
                 <div className="text-center py-8 text-gray-400 text-sm">Yükleniyor...</div>
-              ) : mazotAlimDetay ? (
-                /* Detay görünümü */
+              ) : mazotDetay ? (
+                /* Level 3 — ay detayı + düzenleme/silme */
                 <div className="divide-y divide-gray-100">
-                  <div className="flex justify-between py-2 text-xs font-bold text-gray-400 uppercase">
-                    <span>Tarih</span>
-                    <span className="flex gap-6">
-                      <span>Çalışma Saati</span>
-                      <span>Litre</span>
-                    </span>
+                  <div className="flex items-center gap-2 py-2 text-xs font-bold text-gray-400 uppercase">
+                    <span className="flex-1">Tarih</span>
+                    <span className="w-16" />
+                    <span className="w-14 text-right">{selectedVehicle === 'traktor' || selectedVehicle === 'tir' ? 'KM' : 'Saat'}</span>
+                    <span className="w-12 text-right">Litre</span>
                   </div>
-                  {mazotAlimDetay.rows.length === 0 ? (
+                  {mazotDetay.rows.length === 0 ? (
                     <div className="text-center py-8 text-gray-400 text-sm">Henüz kayıt yok.</div>
                   ) : (
-                    mazotAlimDetay.rows.map((row, i) => (
-                      <div key={i} className="flex justify-between items-center py-3 text-sm">
-                        <span className="text-gray-700">{row.form_date}</span>
-                        <span className="flex gap-6 text-right">
-                          <span className="text-gray-500 w-20 text-right">{row.calisma_saati ?? '—'}</span>
-                          <span className="font-bold text-amber-700 w-16 text-right">{row.litre} L</span>
-                        </span>
+                    mazotDetay.rows.map(row => (
+                      editingRow?.id === row.id ? (
+                        <div key={row.id} className="flex items-center gap-2 py-2 text-sm">
+                          <span className="flex-1 text-gray-500 text-xs">{row.form_date}</span>
+                          <div className="flex gap-1 w-16 justify-end">
+                            <button onClick={handleEditSave} className="w-7 h-7 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-xs font-bold">✓</button>
+                            <button onClick={() => setEditingRow(null)} className="w-7 h-7 bg-gray-100 text-gray-500 rounded-full flex items-center justify-center text-xs font-bold">✕</button>
+                          </div>
+                          <input
+                            type="number"
+                            value={selectedVehicle === 'traktor' || selectedVehicle === 'tir' ? editingRow.kilometre : editingRow.calisma_saati}
+                            onChange={e => setEditingRow(prev => prev && {
+                              ...prev,
+                              ...(selectedVehicle === 'traktor' || selectedVehicle === 'tir'
+                                ? { kilometre: e.target.value }
+                                : { calisma_saati: e.target.value }),
+                            })}
+                            className="w-14 border border-gray-300 rounded px-1.5 py-1 text-xs text-right focus:outline-none focus:border-amber-400"
+                            placeholder={selectedVehicle === 'traktor' || selectedVehicle === 'tir' ? 'km' : 'saat'}
+                          />
+                          <input
+                            type="number"
+                            value={editingRow.litre}
+                            onChange={e => setEditingRow(prev => prev && { ...prev, litre: e.target.value })}
+                            className="w-12 border border-gray-300 rounded px-1.5 py-1 text-xs text-right focus:outline-none focus:border-amber-400"
+                            placeholder="litre"
+                          />
+                        </div>
+                      ) : (
+                        <div key={row.id} className="flex items-center gap-2 py-3 text-sm">
+                          <span className="flex-1 text-gray-700">{row.form_date}</span>
+                          <div className="flex gap-1 w-16 justify-end">
+                            <button
+                              onClick={() => setEditingRow({ id: row.id, litre: row.litre, calisma_saati: row.calisma_saati ?? '', kilometre: row.kilometre ?? '' })}
+                              className="w-7 h-7 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => handleDelete(row.id)}
+                              className="w-7 h-7 bg-red-50 text-red-500 rounded-full flex items-center justify-center"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m-7 0a1 1 0 01-1-1V5a1 1 0 011-1h8a1 1 0 011 1v1a1 1 0 01-1 1H5z" />
+                              </svg>
+                            </button>
+                          </div>
+                          <span className="w-14 text-gray-500 text-right">
+                            {selectedVehicle === 'traktor' || selectedVehicle === 'tir'
+                              ? (row.kilometre ?? '—')
+                              : (row.calisma_saati ?? '—')}
+                          </span>
+                          <span className="w-12 font-bold text-amber-700 text-right">{row.litre} L</span>
+                        </div>
+                      )
+                    ))
+                  )}
+                </div>
+              ) : mazotAylik ? (
+                /* Level 2 — aylık özet */
+                <div className="divide-y divide-gray-100">
+                  <div className="flex justify-between py-2 text-xs font-bold text-gray-400 uppercase">
+                    <span>Ay</span>
+                    <span>Toplam Mazot</span>
+                  </div>
+                  {mazotAylik.months.length === 0 ? (
+                    <div className="text-center py-8 text-gray-400 text-sm">Henüz veri yok.</div>
+                  ) : (
+                    mazotAylik.months.map(m => (
+                      <div
+                        key={m.key}
+                        onClick={() => handleOpenMazotDetay(mazotAylik.forklift_no, m.key, m.label)}
+                        className="flex justify-between items-center py-3 text-sm cursor-pointer active:bg-gray-50"
+                      >
+                        <span className="font-medium text-gray-700">{m.label}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-amber-700">{m.toplam} litre</span>
+                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
                       </div>
                     ))
                   )}
                 </div>
               ) : (
-                /* Özet liste */
+                /* Level 1 — araç özeti */
                 <div className="divide-y divide-gray-100">
                   <div className="flex justify-between py-2 text-xs font-bold text-gray-400 uppercase">
-                    <span>{VEHICLE_LABELS[selectedVehicle]} No</span>
+                    <span>
+                      {selectedVehicle === 'traktor' || selectedVehicle === 'tir'
+                        ? 'Plaka'
+                        : `${VEHICLE_LABELS[selectedVehicle]} No`}
+                    </span>
                     <span>Toplam Mazot</span>
                   </div>
                   {mazotAlimList.length === 0 ? (
@@ -741,7 +911,7 @@ export default function DashboardPage() {
                     mazotAlimList.map(row => (
                       <div
                         key={row.forklift_no}
-                        onClick={() => handleOpenMazotDetay(row.forklift_no)}
+                        onClick={() => handleOpenMazotAylik(row.forklift_no)}
                         className="flex justify-between items-center py-3 text-sm cursor-pointer active:bg-gray-50"
                       >
                         <span className="font-semibold text-gray-700">{row.forklift_no}</span>

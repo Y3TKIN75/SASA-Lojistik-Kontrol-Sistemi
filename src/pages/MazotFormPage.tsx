@@ -5,6 +5,11 @@ import { getSession } from '../lib/session';
 import type { Vardiya } from '../types';
 
 const KALMAR_LISTESI = ['HYSTER', '2008', '2019', '2020', '2021', '2024-1', '2024-2'];
+const TRAKTOR_LISTESI = [
+  '01CMN67','01CMN66','01EMM95','01AGJ118','01AGA347',
+  '33AKC670','01ARB397','01ARB400','01AKA062','01BDY138',
+];
+const TIR_LISTESI = ['01 AGU 903','01 AGU 896','01 AGU 892'];
 
 function detectVardiya(): Vardiya {
   const now = new Date();
@@ -41,6 +46,7 @@ export default function MazotFormPage() {
   const homePath = HOME_PATHS[session.role] ?? '/';
 
   const [vardiya] = useState<Vardiya>(detectVardiya());
+  const [plaka, setPlaka] = useState('');
   const [forkliftNo, setForkliftNo] = useState('');
   const [kalmarNo, setKalmarNo] = useState('');
   const [calismaSaati, setCalismaSaati] = useState('');
@@ -51,7 +57,7 @@ export default function MazotFormPage() {
   const [submitted, setSubmitted] = useState(false);
 
   const allFilled = isKmBased
-    ? kilometre.trim() !== '' && litre.trim() !== ''
+    ? plaka.trim() !== '' && kilometre.trim() !== '' && litre.trim() !== ''
     : isKalmar
       ? kalmarNo.trim() !== '' && calismaSaati.trim() !== '' && litre.trim() !== ''
       : forkliftNo.trim() !== '' && calismaSaati.trim() !== '' && litre.trim() !== '';
@@ -70,7 +76,7 @@ export default function MazotFormPage() {
       vehicle_type: session.role,
       vardiya,
       form_date: getFormDate(),
-      forklift_no: isKmBased ? null : isKalmar ? kalmarNo : forkliftNo,
+      forklift_no: isKmBased ? plaka : isKalmar ? kalmarNo : forkliftNo,
       calisma_saati: isKmBased ? null : calismaSaati,
       kilometre: isKmBased ? kilometre : null,
       litre,
@@ -100,10 +106,16 @@ export default function MazotFormPage() {
           <h2 className="text-2xl font-bold text-gray-800">Kaydedildi!</h2>
           <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm text-left">
             {isKmBased ? (
-              <div className="flex justify-between">
-                <span className="text-gray-500">Kilometre</span>
-                <span className="font-medium text-gray-800">{kilometre}</span>
-              </div>
+              <>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Plaka</span>
+                  <span className="font-medium text-gray-800">{plaka}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Kilometre</span>
+                  <span className="font-medium text-gray-800">{kilometre}</span>
+                </div>
+              </>
             ) : (
               <>
                 <div className="flex justify-between">
@@ -129,7 +141,7 @@ export default function MazotFormPage() {
             <button
               onClick={() => {
                 setSubmitted(false);
-                setForkliftNo(''); setKalmarNo(''); setCalismaSaati(''); setKilometre(''); setLitre('');
+                setPlaka(''); setForkliftNo(''); setKalmarNo(''); setCalismaSaati(''); setKilometre(''); setLitre('');
               }}
               className="flex-1 border-2 border-[#003F87] text-[#003F87] font-bold py-3 rounded-xl text-sm"
             >
@@ -179,19 +191,34 @@ export default function MazotFormPage() {
             <h2 className="font-bold text-gray-700 text-sm uppercase tracking-wide">Mazot Alım Bilgileri</h2>
 
             {isKmBased ? (
-              <div>
-                <label className="text-sm text-gray-500 block mb-1">
-                  {session.role === 'tir' ? 'Tır Kilometresi' : 'Traktör Kilometresi'}
-                </label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={kilometre}
-                  onChange={e => setKilometre(e.target.value)}
-                  placeholder="Örn: 45230"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#003F87]/30"
-                />
-              </div>
+              <>
+                <div>
+                  <label className="text-sm text-gray-500 block mb-1">Plaka</label>
+                  <select
+                    value={plaka}
+                    onChange={e => setPlaka(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#003F87]/30 bg-white"
+                  >
+                    <option value="">Seçiniz...</option>
+                    {(session.role === 'tir' ? TIR_LISTESI : TRAKTOR_LISTESI).map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm text-gray-500 block mb-1">
+                    {session.role === 'tir' ? 'Tır Kilometresi' : 'Traktör Kilometresi'}
+                  </label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={kilometre}
+                    onChange={e => setKilometre(e.target.value)}
+                    placeholder="Örn: 45230"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#003F87]/30"
+                  />
+                </div>
+              </>
             ) : isKalmar ? (
               <>
                 <div>
