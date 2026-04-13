@@ -38,7 +38,7 @@ export const kalmarChecklist: ChecklistItemDef[] = [
 
 export const tirChecklist: ChecklistItemDef[] = [
   { id: 1, soru: 'Lastik basıncı kontrolü yapıldı mı?',                       tur: 'Kontrol'   },
-  { id: 2, soru: 'Aracın etrafında, yeni tespit edilmiş, hasar var mı?',      tur: 'Görsel'    },
+  { id: 2, soru: 'Aracın dış aksamı ve gövdesi hasarsız/sağlam mı?',          tur: 'Görsel'    },
   { id: 3, soru: 'Ekranda görünen yağ seviyesi uygun mu?',                    tur: 'Kontrol'   },
   { id: 4, soru: 'Aracın iç temizliği yapıldı mı?',                           tur: 'Genel'     },
 ];

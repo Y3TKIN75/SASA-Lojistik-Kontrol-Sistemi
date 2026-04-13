@@ -37,6 +37,11 @@ export default function DashboardPage() {
   const [submissions, setSubmissions] = useState<FormSubmission[]>([]);
   const [loadingSubs, setLoadingSubs] = useState(false);
   const [selectedSubmission, setSelectedSubmission] = useState<FormSubmission | null>(null);
+  const [selectedMazot, setSelectedMazot] = useState<{
+    kilometre?: string | null;
+    litre?: string | null;
+    calisma_saati?: string | null;
+  } | null>(null);
 
   // Forklift Saatleri
   const [showForkliftSaatleri, setShowForkliftSaatleri] = useState(false);
@@ -52,6 +57,15 @@ export default function DashboardPage() {
   const [showDoldurmadi, setShowDoldurmadi] = useState(false);
   const [doldurmadi, setDoldurmadi] = useState<{ ad_soyad: string; sicil_no: string }[]>([]);
   const [loadingDoldurmadi, setLoadingDoldurmadi] = useState(false);
+
+  // Mazot Alım
+  const [showMazotAlim, setShowMazotAlim] = useState(false);
+  const [mazotAlimList, setMazotAlimList] = useState<{ forklift_no: string; toplam: number }[]>([]);
+  const [loadingMA, setLoadingMA] = useState(false);
+  const [mazotAlimDetay, setMazotAlimDetay] = useState<{
+    forklift_no: string;
+    rows: { form_date: string; calisma_saati: string | null; litre: string }[];
+  } | null>(null);
 
   useEffect(() => {
     const fetchSubmissions = async () => {
@@ -119,6 +133,65 @@ export default function DashboardPage() {
       .sort((a, b) => a.forklift_no.localeCompare(b.forklift_no, 'tr'));
     setKalmarSaatleri(sorted);
     setLoadingKS(false);
+  };
+
+  const handleSelectSubmission = async (sub: FormSubmission) => {
+    setSelectedSubmission(sub);
+    setSelectedMazot(null);
+    const { data } = await supabase
+      .from('mazot_submissions')
+      .select('kilometre, litre, calisma_saati')
+      .eq('sicil_no', sub.sicil_no)
+      .eq('vardiya', sub.vardiya)
+      .eq('form_date', sub.form_date)
+      .eq('vehicle_type', sub.vehicle_type)
+      .maybeSingle();
+    setSelectedMazot(data ?? null);
+  };
+
+  const handleOpenMazotAlim = async () => {
+    setShowMazotAlim(true);
+    setMazotAlimDetay(null);
+    setLoadingMA(true);
+    const { data } = await supabase
+      .from('mazot_submissions')
+      .select('forklift_no, litre')
+      .eq('vehicle_type', selectedVehicle)
+      .not('forklift_no', 'is', null);
+
+    const map = new Map<string, number>();
+    for (const row of (data ?? [])) {
+      map.set(row.forklift_no, (map.get(row.forklift_no) ?? 0) + Number(row.litre ?? 0));
+    }
+    const sorted = Array.from(map.entries())
+      .map(([forklift_no, toplam]) => ({ forklift_no, toplam }))
+      .sort((a, b) =>
+        selectedVehicle === 'forklift'
+          ? Number(a.forklift_no) - Number(b.forklift_no)
+          : a.forklift_no.localeCompare(b.forklift_no, 'tr')
+      );
+    setMazotAlimList(sorted);
+    setLoadingMA(false);
+  };
+
+  const handleOpenMazotDetay = async (forklift_no: string) => {
+    setLoadingMA(true);
+    const { data } = await supabase
+      .from('mazot_submissions')
+      .select('form_date, calisma_saati, litre')
+      .eq('vehicle_type', selectedVehicle)
+      .eq('forklift_no', forklift_no)
+      .order('form_date', { ascending: false });
+
+    setMazotAlimDetay({
+      forklift_no,
+      rows: (data ?? []).map((r: { form_date: string; calisma_saati: string | null; litre: string }) => ({
+        form_date: r.form_date,
+        calisma_saati: r.calisma_saati,
+        litre: r.litre,
+      })),
+    });
+    setLoadingMA(false);
   };
 
   const handleOpenDoldurmadi = async () => {
@@ -203,6 +276,16 @@ export default function DashboardPage() {
           </button>
         )}
 
+        {/* Mazot Alım Butonu — Forklift ve Kalmar sekmelerinde */}
+        {(selectedVehicle === 'forklift' || selectedVehicle === 'kalmar') && (
+          <button
+            onClick={handleOpenMazotAlim}
+            className="w-full bg-white border-2 border-amber-400 text-amber-700 font-bold py-3 rounded-xl text-sm active:scale-95 transition-transform"
+          >
+            {VEHICLE_LABELS[selectedVehicle]} Mazot Alım
+          </button>
+        )}
+
         {/* Tarih Filtresi */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">Tarih Seçin</label>
@@ -254,7 +337,7 @@ export default function DashboardPage() {
                       return (
                         <div
                           key={sub.id}
-                          onClick={() => setSelectedSubmission(sub)}
+                          onClick={() => handleSelectSubmission(sub)}
                           className="px-4 py-3 flex items-center justify-between cursor-pointer active:bg-gray-50"
                         >
                           <div>
@@ -484,7 +567,7 @@ export default function DashboardPage() {
       {selectedSubmission && (
         <div
           className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center"
-          onClick={() => setSelectedSubmission(null)}
+          onClick={() => { setSelectedSubmission(null); setSelectedMazot(null); }}
         >
           <div
             className="bg-white rounded-t-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto"
@@ -500,7 +583,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <button
-                onClick={() => setSelectedSubmission(null)}
+                onClick={() => { setSelectedSubmission(null); setSelectedMazot(null); }}
                 className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center"
               >
                 <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -519,6 +602,29 @@ export default function DashboardPage() {
                     <span className="text-gray-500">Çalışma Saati</span>
                     <span className="font-semibold text-gray-800">{selectedSubmission.calisma_saati ?? '-'}</span>
                   </div>
+                </div>
+              )}
+              {selectedMazot && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1 text-sm">
+                  <div className="text-xs font-bold text-amber-700 uppercase mb-1">Mazot Bilgisi</div>
+                  {selectedMazot.kilometre && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Kilometre</span>
+                      <span className="font-semibold text-gray-800">{selectedMazot.kilometre} km</span>
+                    </div>
+                  )}
+                  {selectedMazot.calisma_saati && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Çalışma Saati</span>
+                      <span className="font-semibold text-gray-800">{selectedMazot.calisma_saati} saat</span>
+                    </div>
+                  )}
+                  {selectedMazot.litre && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Alınan Mazot</span>
+                      <span className="font-semibold text-gray-800">{selectedMazot.litre} litre</span>
+                    </div>
+                  )}
                 </div>
               )}
               {(selectedSubmission.checklist as ChecklistItemResult[]).map(item => (
@@ -552,6 +658,104 @@ export default function DashboardPage() {
                   </span>
                 </div>
               ))}
+            </div>
+            <div className="h-6" />
+          </div>
+        </div>
+      )}
+
+      {/* Mazot Alım Modalı */}
+      {showMazotAlim && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center"
+          onClick={() => { setShowMazotAlim(false); setMazotAlimDetay(null); }}
+        >
+          <div
+            className="bg-white rounded-t-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {mazotAlimDetay && (
+                  <button
+                    onClick={() => setMazotAlimDetay(null)}
+                    className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center mr-1"
+                  >
+                    <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                )}
+                <div className="font-bold text-gray-800">
+                  {mazotAlimDetay
+                    ? `${mazotAlimDetay.forklift_no} — Mazot Geçmişi`
+                    : `${VEHICLE_LABELS[selectedVehicle]} Mazot Alım`}
+                </div>
+              </div>
+              <button
+                onClick={() => { setShowMazotAlim(false); setMazotAlimDetay(null); }}
+                className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center"
+              >
+                <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-4 py-3">
+              {loadingMA ? (
+                <div className="text-center py-8 text-gray-400 text-sm">Yükleniyor...</div>
+              ) : mazotAlimDetay ? (
+                /* Detay görünümü */
+                <div className="divide-y divide-gray-100">
+                  <div className="flex justify-between py-2 text-xs font-bold text-gray-400 uppercase">
+                    <span>Tarih</span>
+                    <span className="flex gap-6">
+                      <span>Çalışma Saati</span>
+                      <span>Litre</span>
+                    </span>
+                  </div>
+                  {mazotAlimDetay.rows.length === 0 ? (
+                    <div className="text-center py-8 text-gray-400 text-sm">Henüz kayıt yok.</div>
+                  ) : (
+                    mazotAlimDetay.rows.map((row, i) => (
+                      <div key={i} className="flex justify-between items-center py-3 text-sm">
+                        <span className="text-gray-700">{row.form_date}</span>
+                        <span className="flex gap-6 text-right">
+                          <span className="text-gray-500 w-20 text-right">{row.calisma_saati ?? '—'}</span>
+                          <span className="font-bold text-amber-700 w-16 text-right">{row.litre} L</span>
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              ) : (
+                /* Özet liste */
+                <div className="divide-y divide-gray-100">
+                  <div className="flex justify-between py-2 text-xs font-bold text-gray-400 uppercase">
+                    <span>{VEHICLE_LABELS[selectedVehicle]} No</span>
+                    <span>Toplam Mazot</span>
+                  </div>
+                  {mazotAlimList.length === 0 ? (
+                    <div className="text-center py-8 text-gray-400 text-sm">Henüz veri yok.</div>
+                  ) : (
+                    mazotAlimList.map(row => (
+                      <div
+                        key={row.forklift_no}
+                        onClick={() => handleOpenMazotDetay(row.forklift_no)}
+                        className="flex justify-between items-center py-3 text-sm cursor-pointer active:bg-gray-50"
+                      >
+                        <span className="font-semibold text-gray-700">{row.forklift_no}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-amber-700">{row.toplam} litre</span>
+                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
             <div className="h-6" />
           </div>
