@@ -4,26 +4,8 @@ import { supabase } from '../lib/supabase';
 import { getSession, clearSession } from '../lib/session';
 import type { CheckResult, Vardiya } from '../types';
 import { tirChecklist } from '../data/checklists';
+import { detectVardiya, getFormDate } from '../lib/vardiya';
 import ChecklistItem from '../components/ChecklistItem';
-
-function detectVardiya(): Vardiya {
-  const now = new Date();
-  const m = now.getHours() * 60 + now.getMinutes();
-  if (m >= 23 * 60 + 45 || m < 7 * 60 + 45) return '00:00-08:00';
-  if (m < 15 * 60 + 45) return '08:00-16:00';
-  return '16:00-00:00';
-}
-
-function getFormDate(): string {
-  const now = new Date();
-  const m = now.getHours() * 60 + now.getMinutes();
-  if (m >= 23 * 60 + 45) {
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split('T')[0];
-  }
-  return now.toISOString().split('T')[0];
-}
 
 export default function TirFormPage() {
   const navigate = useNavigate();

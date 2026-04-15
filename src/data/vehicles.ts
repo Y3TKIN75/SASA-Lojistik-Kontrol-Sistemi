@@ -1,0 +1,10 @@
+export const KALMAR_LISTESI = ['HYSTER', '2008', '2019', '2020', '2021', '2024-1', '2024-2'];
+
+export const TRAKTOR_LISTESI = [
+  '01CMN67', '01CMN66', '01EMM95', '01AGJ118', '01AGA347',
+  '33AKC670', '01ARB397', '01ARB400', '01AKA062', '01BDY138',
+];
+
+export const TIR_LISTESI = ['01 AGU 903', '01 AGU 896', '01 AGU 892'];
+
+export const FORKLIFT_SAYISI = 160;

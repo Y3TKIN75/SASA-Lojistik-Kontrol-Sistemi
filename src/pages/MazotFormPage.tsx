@@ -3,33 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getSession } from '../lib/session';
 import type { Vardiya } from '../types';
-
-const KALMAR_LISTESI = ['HYSTER', '2008', '2019', '2020', '2021', '2024-1', '2024-2'];
-const TRAKTOR_LISTESI = [
-  '01CMN67','01CMN66','01EMM95','01AGJ118','01AGA347',
-  '33AKC670','01ARB397','01ARB400','01AKA062','01BDY138',
-];
-const TIR_LISTESI = ['01 AGU 903','01 AGU 896','01 AGU 892'];
-
-function detectVardiya(): Vardiya {
-  const now = new Date();
-  const m = now.getHours() * 60 + now.getMinutes();
-  if (m >= 23 * 60 + 45 || m < 7 * 60 + 45) return '00:00-08:00';
-  if (m < 15 * 60 + 45) return '08:00-16:00';
-  return '16:00-00:00';
-}
-
-// 23:45'ten sonra vardiya 00:00-08:00'e geçer, form tarihi ertesi güne ait.
-function getFormDate(): string {
-  const now = new Date();
-  const m = now.getHours() * 60 + now.getMinutes();
-  if (m >= 23 * 60 + 45) {
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split('T')[0];
-  }
-  return now.toISOString().split('T')[0];
-}
+import { KALMAR_LISTESI, TRAKTOR_LISTESI, TIR_LISTESI, FORKLIFT_SAYISI } from '../data/vehicles';
+import { detectVardiya, getFormDate } from '../lib/vardiya';
 
 const HOME_PATHS: Record<string, string> = {
   traktor: '/home/traktor',
@@ -256,7 +231,7 @@ export default function MazotFormPage() {
                     className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#003F87]/30 bg-white"
                   >
                     <option value="">Seçiniz...</option>
-                    {Array.from({ length: 160 }, (_, i) => i + 1).map(n => (
+                    {Array.from({ length: FORKLIFT_SAYISI }, (_, i) => i + 1).map(n => (
                       <option key={n} value={String(n)}>{n}</option>
                     ))}
                   </select>

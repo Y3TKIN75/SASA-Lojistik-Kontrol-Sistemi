@@ -91,7 +91,7 @@ export default function DashboardPage() {
       setLoadingSubs(true);
       const { data } = await supabase
         .from('form_submissions')
-        .select('*')
+        .select('id, sicil_no, ad_soyad, vardiya, vehicle_type, form_date, submitted_at, forklift_no, calisma_saati, checklist')
         .eq('form_date', selectedDate)
         .eq('vehicle_type', selectedVehicle)
         .order('submitted_at');
@@ -115,7 +115,7 @@ export default function DashboardPage() {
       .eq('vehicle_type', 'forklift')
       .not('forklift_no', 'is', null)
       .order('submitted_at', { ascending: false })
-      .limit(500);
+      .limit(5000);
 
     const map = new Map<string, string>();
     for (const row of (data ?? [])) {
@@ -240,16 +240,20 @@ export default function DashboardPage() {
     setLoadingMA(false);
   };
 
+  const [editError, setEditError] = useState<string | null>(null);
+
   const handleEditSave = async () => {
     if (!editingRow || !mazotDetay) return;
     const isKmBased = selectedVehicle === 'traktor' || selectedVehicle === 'tir';
     const updateFields = isKmBased
       ? { litre: editingRow.litre, kilometre: editingRow.kilometre || null }
       : { litre: editingRow.litre, calisma_saati: editingRow.calisma_saati || null };
-    await supabase
+    const { error } = await supabase
       .from('mazot_submissions')
       .update(updateFields)
       .eq('id', editingRow.id);
+    if (error) { setEditError('Kaydedilemedi: ' + error.message); return; }
+    setEditError(null);
     setMazotDetay(prev => prev && {
       ...prev,
       rows: prev.rows.map(r => r.id === editingRow.id
@@ -260,7 +264,10 @@ export default function DashboardPage() {
   };
 
   const handleDelete = async (id: string) => {
-    await supabase.from('mazot_submissions').delete().eq('id', id);
+    if (!window.confirm('Bu kaydı silmek istediğinizden emin misiniz?')) return;
+    const { error } = await supabase.from('mazot_submissions').delete().eq('id', id);
+    if (error) { setEditError('Silinemedi: ' + error.message); return; }
+    setEditError(null);
     setMazotDetay(prev => prev && { ...prev, rows: prev.rows.filter(r => r.id !== id) });
   };
 
@@ -748,7 +755,7 @@ export default function DashboardPage() {
       {showMazotAlim && (
         <div
           className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center"
-          onClick={() => { setShowMazotAlim(false); setMazotAylik(null); setMazotDetay(null); setEditingRow(null); }}
+          onClick={() => { setShowMazotAlim(false); setMazotAylik(null); setMazotDetay(null); setEditingRow(null); setEditError(null); }}
         >
           <div
             className="bg-white rounded-t-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto"
@@ -758,7 +765,7 @@ export default function DashboardPage() {
               <div className="flex items-center gap-2">
                 {mazotDetay ? (
                   <button
-                    onClick={() => { setMazotDetay(null); setEditingRow(null); }}
+                    onClick={() => { setMazotDetay(null); setEditingRow(null); setEditError(null); }}
                     className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center mr-1"
                   >
                     <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -784,7 +791,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <button
-                onClick={() => { setShowMazotAlim(false); setMazotAylik(null); setMazotDetay(null); setEditingRow(null); }}
+                onClick={() => { setShowMazotAlim(false); setMazotAylik(null); setMazotDetay(null); setEditingRow(null); setEditError(null); }}
                 className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center"
               >
                 <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -798,6 +805,11 @@ export default function DashboardPage() {
               ) : mazotDetay ? (
                 /* Level 3 — ay detayı + düzenleme/silme */
                 <div className="divide-y divide-gray-100">
+                  {editError && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm font-medium mb-2">
+                      {editError}
+                    </div>
+                  )}
                   <div className="flex items-center gap-2 py-2 text-xs font-bold text-gray-400 uppercase">
                     <span className="flex-1">Tarih</span>
                     <span className="w-16" />
